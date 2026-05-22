@@ -46,3 +46,6 @@ TXT_FILE = "tv.txt"
 RETRY_MAX_ATTEMPTS = 3
 RETRY_BACKOFF_FACTOR = 2
 RETRY_MAX_WAIT = 60
+
+# Demo 文件路径（相对于项目根目录）
+DEMO_FILE = "demo.txt"
