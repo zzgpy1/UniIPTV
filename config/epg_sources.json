@@ -1,0 +1,20 @@
+[
+    {
+        "name": "51zmt",
+        "url": "https://epg.51zmt.top:8000/api/",
+        "type": "api",
+        "enabled": true
+    },
+    {
+        "name": "epg.pw",
+        "url": "https://epg.pw/api/",
+        "type": "api",
+        "enabled": true
+    },
+    {
+        "name": "112114",
+        "url": "https://www.112114.xyz/epg/",
+        "type": "xmltv",
+        "enabled": true
+    }
+]
