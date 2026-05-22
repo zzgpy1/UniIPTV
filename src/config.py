@@ -16,6 +16,7 @@ MAX_WORKERS = int(os.getenv("MAX_WORKERS", 10))
 TIMEOUT = int(os.getenv("TIMEOUT", 10))
 FFMPEG_ENABLE = os.getenv("FFMPEG_ENABLE", "true").lower() == "true"
 ENABLE_RETRY = os.getenv("ENABLE_RETRY", "true").lower() == "true"
+FFMPEG_STRICT = os.getenv("FFMPEG_STRICT", "false").lower() == "true"
 
 # HTTP 请求头
 HEADERS = {
@@ -50,5 +51,19 @@ RETRY_MAX_WAIT = 60
 # Demo 文件路径（相对于项目根目录）
 DEMO_FILE = "demo.txt"
 
-# ffmpeg 深度验证严格模式（False=宽松，执行失败默认有效）
-FFMPEG_STRICT = os.getenv("FFMPEG_STRICT", "false").lower() == "true"
+# ========== 新增：IP 解析与地域筛选配置 ==========
+# IP 数据库文件路径（相对于项目根目录）
+IP_DATABASE_FILE = "qqwry.dat"
+
+# 是否启用 IP 解析（解析频道 URL 的 IP 归属地，用于后续筛选）
+ENABLE_IP_RESOLVE = os.getenv("ENABLE_IP_RESOLVE", "true").lower() == "true"
+
+# 地域筛选配置（可选，用于按地域优选）
+# 如果设置了这些值，则只保留匹配地域/运营商的频道
+# 例如：PREFERRED_LOCATION = "广东"  或 PREFERRED_LOCATION = "广东,上海,北京"
+#       PREFERRED_ISP = "电信"  或 PREFERRED_ISP = "电信,联通"
+PREFERRED_LOCATION = os.getenv("PREFERRED_LOCATION", "")  # 多个用逗号分隔
+PREFERRED_ISP = os.getenv("PREFERRED_ISP", "")            # 多个用逗号分隔
+
+# 是否启用地域优选（只保留匹配地域/运营商的频道）
+ENABLE_REGION_FILTER = os.getenv("ENABLE_REGION_FILTER", "false").lower() == "true"
