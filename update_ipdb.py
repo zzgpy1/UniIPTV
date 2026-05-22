@@ -8,7 +8,8 @@ import time
 # 定义多个可靠的 qqwry.dat 下载源（按优先级排序）
 QQWRY_SOURCES = [
     "https://github.com/metowolf/qqwry.dat/releases/latest/download/qqwry.dat",                # GitHub 源[reference:2]
-    "https://raw.githubusercontent.com/FW27623/qqwry/main/qqwry.dat",                          # GitHub 镜像源[reference:3]
+    "https://cdn.1008.site/gh/nmgliangwei/qqwry@main/qqwry.dat",                               # GitHub 镜像源[reference:3]
+    "https://raw.githubusercontent.com/FW27623/qqwry/main/qqwry.dat"                          # GitHub 镜像源[reference:4]
 ]
 
 # 配置重试参数
