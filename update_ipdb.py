@@ -1,77 +1,67 @@
 #!/usr/bin/env python3
-# IP 数据库自动更新模块（使用 qqwry 镜像源的稳定版本）
+# IP 数据库自动更新模块（多源策略）
 import os
 import sys
 import requests
-import gzip
-import shutil
-from io import BytesIO
 import time
 
-# 备用的下载源（GitCode 镜像：https://gitcode.com/qqwry/qqwry.dat）
-QQWRY_MIRROR_URL = "https://gitcode.com/qqwry/qqwry.dat/raw/main/qqwry.dat"
+# 定义多个可靠的 qqwry.dat 下载源（按优先级排序）
+QQWRY_SOURCES = [
+    "https://gitcode.com/Premium-Resources/cb24d/raw/main/qqwry.dat",                # 新 GitCode 源[reference:2]
+    "https://raw.githubusercontent.com/FW27623/qqwry/main/qqwry.dat",              # GitHub 镜像源[reference:3]
+]
 
 # 配置重试参数
-MAX_RETRIES = 3
-RETRY_DELAY = 5  # 秒
+MAX_RETRIES = 2
+RETRY_DELAY = 3  # 秒
 
-def download_file_with_retry(url, filename, max_retries=MAX_RETRIES, delay=RETRY_DELAY):
-    """
-    带重试机制的文件下载函数
-    增强的网络容错性，在 GitHub Actions 等网络不稳定的环境中也能稳定工作
-    """
-    for attempt in range(max_retries):
+def download_file_with_retry(url, filename):
+    """带重试机制的文件下载函数。成功返回 True，失败返回 False。"""
+    for attempt in range(MAX_RETRIES):
         try:
-            print(f"正在从 {url} 下载... (尝试 {attempt + 1}/{max_retries})")
+            print(f"正在从 {url} 下载... (尝试 {attempt + 1}/{MAX_RETRIES})")
             response = requests.get(url, timeout=30, stream=True)
             response.raise_for_status()
-            
-            # 检查内容类型，排除错误页面
-            content_type = response.headers.get('content-type', '')
-            if 'text/html' in content_type and '404' in response.text[:100]:
-                raise Exception("下载链接返回了404错误页面，可能URL已失效")
-            
-            # 写入文件
+
+            # 简单的文件大小验证，避免保存错误页面
+            if int(response.headers.get('content-length', 0)) < 1024 * 1024:
+                raise Exception("下载的文件过小，可能无效")
+
             with open(filename, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
-            
-            # 验证文件有效性（简单的文件大小检查）
-            if os.path.getsize(filename) < 1024 * 1024:  # 小于1MB，可能有问题
-                raise Exception("下载的文件过小，可能无效")
-                
-            print(f"✅ 成功下载: {filename}")
+
+            print(f"✅ 成功下载: {filename}，大小: {os.path.getsize(filename)} 字节")
             return True
         except Exception as e:
-            print(f"⚠️ 下载失败 (尝试 {attempt + 1}/{max_retries}): {e}")
-            if attempt < max_retries - 1:
-                print(f"等待 {delay} 秒后重试...")
-                time.sleep(delay)
+            print(f"⚠️ 下载失败 (尝试 {attempt + 1}/{MAX_RETRIES}): {e}")
+            if attempt < MAX_RETRIES - 1:
+                print(f"等待 {RETRY_DELAY} 秒后重试...")
+                time.sleep(RETRY_DELAY)
             else:
                 return False
     return False
 
 def update_ip_database():
-    """从多个源尝试更新 IP 数据库（优先使用在线镜像，回退到本地）"""
-    
-    # 1. 尝试从在线镜像源下载最新数据库
-    print("🔄 尝试从 qqwry 镜像源下载最新数据库...")
-    
-    if download_file_with_retry(QQWRY_MIRROR_URL, "qqwry.dat"):
-        return True, None
-    
-    print("⚠️ 在线下载失败，将使用本地备份策略")
+    """从多个源尝试更新 IP 数据库。"""
+    print("🔄 尝试从多个在线源下载最新数据库...")
+
+    for source_url in QQWRY_SOURCES:
+        if download_file_with_retry(source_url, "qqwry.dat"):
+            return True, None
+
+    print("⚠️ 所有在线源均下载失败，将使用本地备份策略")
     return False, "所有在线源均不可用，请检查网络连接或稍后重试"
 
 def check_database_exists() -> bool:
-    """检查 IP 数据库是否存在"""
+    """检查 IP 数据库是否存在。"""
     return os.path.exists("qqwry.dat")
 
 def get_database_info() -> dict:
-    """获取 IP 数据库信息"""
+    """获取 IP 数据库信息。"""
     if not check_database_exists():
         return {"exists": False}
-    
+
     try:
         from qqwry import QQwry
         q = QQwry()
@@ -81,22 +71,20 @@ def get_database_info() -> dict:
             return {"exists": True, "version": version, "size": size}
     except Exception:
         pass
-    
+
     return {"exists": True, "version": "未知", "size": os.path.getsize("qqwry.dat")}
 
 if __name__ == "__main__":
     print("=" * 50)
     print("纯真 IP 数据库更新工具")
     print("=" * 50)
-    
-    # 显示现有数据库信息
+
     info = get_database_info()
     if info["exists"]:
         print(f"当前数据库: {info.get('version', '未知版本')}, 大小: {info.get('size', 0)} 字节")
     else:
         print("当前无 IP 数据库文件")
-    
-    # 尝试更新数据库
+
     success, err = update_ip_database()
     if not success:
         print(f"\n⚠️ IP 数据库更新失败: {err}")
