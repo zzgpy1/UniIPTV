@@ -1,56 +1,38 @@
 [
     {
-        "name": "iptv-org_China_gh-pages",
+        "name": "iptv_org_gh_pages_countries_cn",
         "url": "https://raw.githubusercontent.com/iptv-org/iptv/gh-pages/countries/cn.m3u",
         "type": "m3u",
         "enabled": true
     },
     {
-        "name": "iptv-org_China_master",
+        "name": "iptv_org_master_streams_cn",
         "url": "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/cn.m3u",
         "type": "m3u",
         "enabled": true
     },
     {
-        "name": "Guovin_IPTV_API",
-        "url": "https://raw.githubusercontent.com/Guovin/iptv-api/main/output/result.m3u",
+        "name": "suxuang_myiptv_ipv4",
+        "url": "https://raw.githubusercontent.com/suxuang/myIPTV/main/ipv4.m3u",
         "type": "m3u",
         "enabled": true
     },
     {
-        "name": "Collect_IPTV_best",
-        "url": "https://raw.githubusercontent.com/zilong7728/Collect-IPTV/main/best_sorted.m3u",
-        "type": "m3u",
-        "enabled": true
-    },
-    {
-        "name": "Fanmingming_live",
-        "url": "https://raw.githubusercontent.com/fanmingming/live/main/tv/m3u/global.m3u",
-        "type": "m3u",
-        "enabled": true
-    },
-    {
-        "name": "YanG-1989_m3u",
-        "url": "https://raw.githubusercontent.com/YanG-1989/m3u/main/Gather.m3u",
-        "type": "m3u",
-        "enabled": true
-    },
-    {
-        "name": "suxuang_myIPTV_ipv4",
-        "url": "https://gh-proxy.com/raw.githubusercontent.com/suxuang/myIPTV/main/ipv4.m3u",
-        "type": "m3u",
-        "enabled": true
-    },
-    {
-        "name": "vbskycn_IPTV_txt",
-        "url": "https://live.zbds.top/tv/iptv4.txt",
+        "name": "vbskycn_iptv_tv_iptv4",
+        "url": "https://raw.githubusercontent.com/vbskycn/iptv/master/tv/iptv4.txt",
         "type": "txt",
         "enabled": true
     },
     {
-        "name": "zzgpy1_Collect_IPTV_best",
-        "url": "https://raw.githubusercontent.com/zilong7728/Collect-IPTV/refs/heads/main/best_sorted.m3u",
+        "name": "zzgpy1_collect_iptv_best_sorted",
+        "url": "https://raw.githubusercontent.com/zzgpy1/Collect-IPTV/main/best_sorted.m3u",
         "type": "m3u",
+        "enabled": true
+    },
+    {
+        "name": "dogwalkerg_iptv_collect_tv_txt_others_output",
+        "url": "https://raw.githubusercontent.com/dogwalkerg/IPTV-collect-tv-txt/main/others_output.txt",
+        "type": "txt",
         "enabled": true
     }
 ]
