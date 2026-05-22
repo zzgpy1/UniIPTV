@@ -41,7 +41,7 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 缓存 IP 数据库（避免每次下载）
+       # 缓存 IP 数据库
       - name: 缓存 IP 数据库
         id: cache-ipdb
         uses: actions/cache@v4
@@ -49,11 +49,10 @@ jobs:
           path: qqwry.dat
           key: ${{ runner.os }}-qqwry-dat
 
-      # 更新 IP 数据库（仅在缓存未命中时运行）
+      # 更新 IP 数据库（移除条件判断，每次都运行）
       - name: 更新 IP 数据库
-        if: steps.cache-ipdb.outputs.cache-hit != 'true'
         run: python update_ipdb.py
-        continue-on-error: true
+        continue-on-error: true   # 更新失败也继续运行（会使用已有缓存）
 
       # 验证数据库文件存在
       - name: 验证数据库文件
@@ -62,7 +61,7 @@ jobs:
             echo "✅ IP 数据库文件存在"
             ls -lh qqwry.dat
           else
-            echo "⚠️ IP 数据库文件不存在，将跳过 IP 归属地解析"
+            echo "⚠️ IP 数据库文件不存在，IP 归属地解析将不可用"
           fi
 
       - name: 执行 IPTV 更新脚本
