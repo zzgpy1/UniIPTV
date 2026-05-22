@@ -49,3 +49,6 @@ RETRY_MAX_WAIT = 60
 
 # Demo 文件路径（相对于项目根目录）
 DEMO_FILE = "demo.txt"
+
+# ffmpeg 深度验证严格模式（False=宽松，执行失败默认有效）
+FFMPEG_STRICT = os.getenv("FFMPEG_STRICT", "false").lower() == "true"
