@@ -47,7 +47,7 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # ===== 新增：缓存 IP 数据库 =====
+        # ===== 缓存 IP 数据库 =====
       - name: 缓存 IP 数据库
         id: cache-ipdb
         uses: actions/cache@v4
@@ -55,13 +55,13 @@ jobs:
           path: qqwry.dat
           key: ${{ runner.os }}-qqwry-dat
 
-      # ===== 新增：更新 IP 数据库（仅在缓存未命中时运行）=====
+      # ===== 更新 IP 数据库（仅在缓存未命中时运行）=====
       - name: 更新 IP 数据库
         if: steps.cache-ipdb.outputs.cache-hit != 'true'
         run: python update_ipdb.py
-        continue-on-error: true  # 即使更新失败也继续运行
+        continue-on-error: true
 
-      # ===== 新增：验证数据库文件存在（可选）=====
+      # ===== 验证数据库文件存在（确保主流程前一定有文件）=====
       - name: 验证数据库文件
         run: |
           if [ -f "qqwry.dat" ]; then
