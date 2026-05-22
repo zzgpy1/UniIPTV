@@ -2,8 +2,8 @@ name: "IPTV 源智能更新与整理"
 
 on:
   schedule:
-    - cron: "0 */6 * * *"    # 每6小时运行一次
-  workflow_dispatch:          # 支持手动触发
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -29,22 +29,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # 安装 ffmpeg（每次运行都安装，确保 ffprobe 可用）
-      - name: 安装 ffmpeg
+      # 移除 ffmpeg 缓存，改为直接安装
+      - name: 安装 ffmpeg（包含 ffprobe）
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
-
-      # 验证 ffprobe 安装
-      - name: 验证 ffprobe
-        run: ffprobe -version
+          ffprobe -version
 
       - name: 安装 Python 依赖
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 缓存 IP 数据库（可选）
+      # 缓存 IP 数据库（避免每次下载）
       - name: 缓存 IP 数据库
         id: cache-ipdb
         uses: actions/cache@v4
@@ -65,10 +62,9 @@ jobs:
             echo "✅ IP 数据库文件存在"
             ls -lh qqwry.dat
           else
-            echo "⚠️ IP 数据库文件不存在，将使用在线解析或跳过 IP 归属地功能"
+            echo "⚠️ IP 数据库文件不存在，将跳过 IP 归属地解析"
           fi
 
-      # 执行 IPTV 更新脚本
       - name: 执行 IPTV 更新脚本
         run: python run.py
         env:
@@ -81,7 +77,6 @@ jobs:
           PREFERRED_LOCATION: ""
           PREFERRED_ISP: ""
 
-      # 部署到 GitHub Pages
       - name: 部署到 GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
