@@ -1,0 +1,12 @@
+{
+  "lives": [
+    {
+      "name": "UniIPTV",
+      "type": 0,
+      "url": "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/output/tv.m3u",
+      "epg": "https://epg.112114.xyz/"
+    }
+  ],
+  "sites": [],
+  "parses": []
+}
