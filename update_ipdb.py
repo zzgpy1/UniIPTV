@@ -1,68 +1,67 @@
 #!/usr/bin/env python3
-# IP 数据库自动更新模块（多源策略）
+# IP 数据库自动更新模块（使用稳定 CDN 源）
 import os
 import sys
 import requests
 import time
 
-# 定义多个可靠的 qqwry.dat 下载源（按优先级排序）
-QQWRY_SOURCES = [
-    "https://github.com/metowolf/qqwry.dat/releases/latest/download/qqwry.dat",                # GitHub 源[reference:2]
-    "https://cdn.1008.site/gh/nmgliangwei/qqwry@main/qqwry.dat",                               # GitHub 镜像源[reference:3]
-    "https://raw.githubusercontent.com/FW27623/qqwry/main/qqwry.dat",                          # GitHub 镜像源[reference:4]
-]
+# 优先使用的 CDN 源（您提供的地址）
+PRIMARY_URL = "https://cdn.1008.site/gh/nmgliangwei/qqwry@main/qqwry.dat"
+# 备用镜像源（GitCode）
+BACKUP_URL = "https://gitcode.com/qqwry/qqwry.dat/raw/main/qqwry.dat"
 
-# 配置重试参数
-MAX_RETRIES = 2
-RETRY_DELAY = 3  # 秒
+MAX_RETRIES = 3
+RETRY_DELAY = 5
 
-def download_file_with_retry(url, filename):
-    """带重试机制的文件下载函数。成功返回 True，失败返回 False。"""
-    for attempt in range(MAX_RETRIES):
-        try:
-            print(f"正在从 {url} 下载... (尝试 {attempt + 1}/{MAX_RETRIES})")
-            response = requests.get(url, timeout=30, stream=True)
-            response.raise_for_status()
+def download_file(url, filename):
+    """下载文件，返回成功标志"""
+    print(f"正在从 {url} 下载...")
+    try:
+        response = requests.get(url, timeout=30, stream=True)
+        response.raise_for_status()
+        # 简单检查内容类型是否为二进制文件
+        content_type = response.headers.get('content-type', '')
+        if 'text/html' in content_type and '404' in response.text[:100]:
+            raise Exception("返回了404错误页面")
+        with open(filename, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        # 验证文件大小（至少1MB）
+        if os.path.getsize(filename) < 1024 * 1024:
+            raise Exception("下载的文件过小，可能无效")
+        print(f"✅ 成功下载: {filename}")
+        return True
+    except Exception as e:
+        print(f"⚠️ 下载失败: {e}")
+        return False
 
-            # 简单的文件大小验证，避免保存错误页面
-            if int(response.headers.get('content-length', 0)) < 1024 * 1024:
-                raise Exception("下载的文件过小，可能无效")
-
-            with open(filename, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-
-            print(f"✅ 成功下载: {filename}，大小: {os.path.getsize(filename)} 字节")
+def download_with_retry(url, filename, max_retries=MAX_RETRIES, delay=RETRY_DELAY):
+    """带重试的下载"""
+    for attempt in range(max_retries):
+        if download_file(url, filename):
             return True
-        except Exception as e:
-            print(f"⚠️ 下载失败 (尝试 {attempt + 1}/{MAX_RETRIES}): {e}")
-            if attempt < MAX_RETRIES - 1:
-                print(f"等待 {RETRY_DELAY} 秒后重试...")
-                time.sleep(RETRY_DELAY)
-            else:
-                return False
+        if attempt < max_retries - 1:
+            print(f"等待 {delay} 秒后重试...")
+            time.sleep(delay)
     return False
 
 def update_ip_database():
-    """从多个源尝试更新 IP 数据库。"""
-    print("🔄 尝试从多个在线源下载最新数据库...")
+    """从多个源尝试更新 IP 数据库"""
+    # 优先使用主 CDN 源
+    if download_with_retry(PRIMARY_URL, "qqwry.dat"):
+        return True, None
+    # 备用源
+    print("主源失败，尝试备用源...")
+    if download_with_retry(BACKUP_URL, "qqwry.dat"):
+        return True, None
+    return False, "所有下载源均不可用"
 
-    for source_url in QQWRY_SOURCES:
-        if download_file_with_retry(source_url, "qqwry.dat"):
-            return True, None
-
-    print("⚠️ 所有在线源均下载失败，将使用本地备份策略")
-    return False, "所有在线源均不可用，请检查网络连接或稍后重试"
-
-def check_database_exists() -> bool:
-    """检查 IP 数据库是否存在。"""
+def check_database_exists():
     return os.path.exists("qqwry.dat")
 
-def get_database_info() -> dict:
-    """获取 IP 数据库信息。"""
+def get_database_info():
     if not check_database_exists():
         return {"exists": False}
-
     try:
         from qqwry import QQwry
         q = QQwry()
@@ -72,7 +71,6 @@ def get_database_info() -> dict:
             return {"exists": True, "version": version, "size": size}
     except Exception:
         pass
-
     return {"exists": True, "version": "未知", "size": os.path.getsize("qqwry.dat")}
 
 if __name__ == "__main__":
@@ -93,7 +91,7 @@ if __name__ == "__main__":
             print("  已有数据库文件可用，将继续使用旧版本。")
         else:
             print("  没有可用数据库文件，IP 归属地解析功能将不可用。")
-        sys.exit(0)   # 更新失败但不中断工作流
+        sys.exit(0)
     else:
         print("\n✅ 数据库已成功更新")
         sys.exit(0)
