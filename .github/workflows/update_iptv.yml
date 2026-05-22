@@ -20,6 +20,7 @@ jobs:
         with:
           python-version: "3.10"
 
+      # 缓存 Python 依赖
       - name: 缓存 Python 依赖
         uses: actions/cache@v4
         with:
@@ -28,26 +29,22 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: 缓存 ffmpeg
-        id: cache-ffmpeg
-        uses: actions/cache@v4
-        with:
-          path: /usr/local/bin/ffmpeg
-          key: ${{ runner.os }}-ffmpeg-v5
-
-      - name: 安装 ffmpeg（若缓存未命中）
-        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+      # 安装 ffmpeg（每次运行都安装，确保 ffprobe 可用）
+      - name: 安装 ffmpeg
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
-          sudo cp $(which ffmpeg) /usr/local/bin/ffmpeg || true
+
+      # 验证 ffprobe 安装
+      - name: 验证 ffprobe
+        run: ffprobe -version
 
       - name: 安装 Python 依赖
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
 
-        # ===== 缓存 IP 数据库 =====
+      # 缓存 IP 数据库（可选）
       - name: 缓存 IP 数据库
         id: cache-ipdb
         uses: actions/cache@v4
@@ -55,13 +52,13 @@ jobs:
           path: qqwry.dat
           key: ${{ runner.os }}-qqwry-dat
 
-      # ===== 更新 IP 数据库（仅在缓存未命中时运行）=====
+      # 更新 IP 数据库（仅在缓存未命中时运行）
       - name: 更新 IP 数据库
         if: steps.cache-ipdb.outputs.cache-hit != 'true'
         run: python update_ipdb.py
         continue-on-error: true
 
-      # ===== 验证数据库文件存在（确保主流程前一定有文件）=====
+      # 验证数据库文件存在
       - name: 验证数据库文件
         run: |
           if [ -f "qqwry.dat" ]; then
@@ -71,6 +68,7 @@ jobs:
             echo "⚠️ IP 数据库文件不存在，将使用在线解析或跳过 IP 归属地功能"
           fi
 
+      # 执行 IPTV 更新脚本
       - name: 执行 IPTV 更新脚本
         run: python run.py
         env:
@@ -78,15 +76,12 @@ jobs:
           TIMEOUT: 10
           FFMPEG_ENABLE: true
           ENABLE_RETRY: true
-          # IP 解析和地域筛选配置
           ENABLE_IP_RESOLVE: true
           ENABLE_REGION_FILTER: false
           PREFERRED_LOCATION: ""
           PREFERRED_ISP: ""
 
-      - name: 验证 ffprobe 安装
-        run: ffprobe -version
-
+      # 部署到 GitHub Pages
       - name: 部署到 GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
