@@ -14,6 +14,7 @@ from src.speed_tester import test_channels_concurrent
 from src.ffmpeg_validator import validate_with_ffmpeg_batch
 from src.classifier import classify_all
 from src.generator import generate_outputs
+from src.demo_filter import filter_and_reorder   # 新增
 
 async def main():
     print("🚀 IPTV 智能整理平台启动")
@@ -49,7 +50,11 @@ async def main():
     print("📁 执行智能分类...")
     classified = classify_all(valid_channels)
     
-    # 6. 生成输出文件
+    # 6. 按 demo.txt 过滤和重排（新增）
+    print("🎯 根据 demo.txt 过滤频道并重排顺序...")
+    classified = filter_and_reorder(classified)
+    
+    # 7. 生成输出文件
     generate_outputs(classified)
     
     total = sum(len(lst) for lst in classified.values())
