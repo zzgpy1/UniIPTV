@@ -1,0 +1,34 @@
+{
+    "keep": [
+        "CCTV1",
+        "CCTV2",
+        "CCTV3",
+        "CCTV4",
+        "CCTV5",
+        "CCTV6",
+        "CCTV7",
+        "CCTV8",
+        "CCTV9",
+        "CCTV10",
+        "CCTV11",
+        "CCTV12",
+        "CCTV13",
+        "CCTV14",
+        "CCTV15",
+        "CCTV16",
+        "CCTV17",
+        "湖南卫视",
+        "浙江卫视",
+        "江苏卫视",
+        "东方卫视",
+        "北京卫视",
+        "广东卫视",
+        "深圳卫视"
+    ],
+    "remove": [],
+    "priority_channels": [
+        "CCTV1",
+        "CCTV5",
+        "湖南卫视"
+    ]
+}
