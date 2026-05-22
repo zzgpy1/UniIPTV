@@ -4,27 +4,26 @@ import os
 import sys
 
 def update_ip_database():
-    """从纯真网络更新 IP 数据库"""
+    """从纯真网络更新 IP 数据库，返回 (成功标志, 错误信息)"""
     try:
         from qqwry import updateQQwry
     except ImportError:
-        print("❌ qqwry-py3 未安装，无法更新 IP 数据库")
-        print("   请运行: pip install qqwry-py3")
-        return False
+        return False, "qqwry-py3 未安装，请运行: pip install qqwry-py3"
     
     print("🔄 正在更新 IP 数据库...")
     try:
-        # 下载并保存到当前目录
         result = updateQQwry("qqwry.dat")
         if isinstance(result, int) and result > 0:
             print(f"✅ IP 数据库更新成功！文件大小: {result} 字节")
-            return True
+            return True, None
         else:
-            print(f"⚠️ IP 数据库更新失败，错误码: {result}")
-            return False
+            msg = f"更新失败，错误码: {result}"
+            print(f"⚠️ {msg}")
+            return False, msg
     except Exception as e:
-        print(f"⚠️ IP 数据库更新异常: {e}")
-        return False
+        msg = f"更新异常: {e}"
+        print(f"⚠️ {msg}")
+        return False, msg
 
 def check_database_exists() -> bool:
     """检查 IP 数据库是否存在"""
@@ -41,11 +40,7 @@ def get_database_info() -> dict:
         if q.load_file("qqwry.dat", loadindex=False):
             version = q.get_lastone()
             size = os.path.getsize("qqwry.dat")
-            return {
-                "exists": True,
-                "version": version,
-                "size": size
-            }
+            return {"exists": True, "version": version, "size": size}
     except Exception:
         pass
     
@@ -62,9 +57,15 @@ if __name__ == "__main__":
     else:
         print("当前无 IP 数据库文件")
     
-    print("\n开始更新...")
-    if update_ip_database():
-        print("\n更新完成！")
+    success, err = update_ip_database()
+    if not success:
+        print(f"\n⚠️ IP 数据库更新失败，将使用已有的数据库（若存在）")
+        # 如果已有数据库文件，返回 0（不影响构建）
+        if check_database_exists():
+            print("  已有数据库文件可用，继续执行。")
+        else:
+            print("  没有可用数据库文件，IP 归属地解析功能将不可用。")
+        sys.exit(0)   # 更新失败但不中断工作流
     else:
-        print("\n更新失败，请检查网络连接")
-        sys.exit(1)
+        print("\n✅ 数据库更新完成")
+        sys.exit(0)
