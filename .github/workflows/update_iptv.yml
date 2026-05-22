@@ -1,0 +1,66 @@
+name: "IPTV 源智能更新与整理"
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"    # 每6小时运行一次
+  workflow_dispatch:          # 支持手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  iptv-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 设置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      # 缓存 Python 依赖
+      - name: 缓存 Python 依赖
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      # 缓存 ffmpeg（Linux 预编译二进制）
+      - name: 缓存 ffmpeg
+        id: cache-ffmpeg
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/bin/ffmpeg
+          key: ${{ runner.os }}-ffmpeg-v5
+
+      - name: 安装 ffmpeg（若缓存未命中）
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          # 确保二进制在缓存路径
+          sudo cp $(which ffmpeg) /usr/local/bin/ffmpeg || true
+
+      - name: 安装 Python 依赖
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 执行 IPTV 更新脚本
+        run: python run.py
+        env:
+          MAX_WORKERS: 10
+          TIMEOUT: 10
+          FFMPEG_ENABLE: true
+          ENABLE_RETRY: true
+
+      - name: 部署到 GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./output
+          publish_branch: gh-pages
