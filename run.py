@@ -20,6 +20,11 @@ async def main():
     print("🚀 IPTV 智能整理平台启动")
     print(f"📡 配置：超时={os.getenv('TIMEOUT','10')}s, 并发={os.getenv('MAX_WORKERS','10')}, ffmpeg={os.getenv('FFMPEG_ENABLE','true')}")
     
+    # 预检 ffprobe
+    if os.getenv("FFMPEG_ENABLE", "true").lower() == "true":
+        from src.ffmpeg_validator import check_ffprobe
+        await check_ffprobe()
+    
     # 1. 拉取所有源
     print("📥 正在拉取源文件...")
     raw_contents = await fetch_all_sources(IPTV_SOURCES)
