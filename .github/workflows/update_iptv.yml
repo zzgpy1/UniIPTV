@@ -29,7 +29,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # 缓存 ffmpeg（Linux 预编译二进制）
+      # 缓存 ffmpeg
       - name: 缓存 ffmpeg
         id: cache-ffmpeg
         uses: actions/cache@v4
@@ -42,13 +42,17 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
-          # 确保二进制在缓存路径
           sudo cp $(which ffmpeg) /usr/local/bin/ffmpeg || true
 
       - name: 安装 Python 依赖
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
+
+      # ===== 新增：更新 IP 数据库 =====
+      - name: 更新 IP 数据库
+        run: python update_ipdb.py
+        continue-on-error: true  # 即使更新失败也继续运行
 
       - name: 执行 IPTV 更新脚本
         run: python run.py
@@ -57,6 +61,14 @@ jobs:
           TIMEOUT: 10
           FFMPEG_ENABLE: true
           ENABLE_RETRY: true
+          # 新增：IP 解析和地域筛选配置（可选）
+          ENABLE_IP_RESOLVE: true
+          ENABLE_REGION_FILTER: false   # 默认关闭地域筛选，需要时可开启
+          PREFERRED_LOCATION: ""        # 示例: "广东,上海"
+          PREFERRED_ISP: ""             # 示例: "电信,联通"
+
+      - name: 验证 ffprobe 安装
+        run: ffprobe -version
 
       - name: 部署到 GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
