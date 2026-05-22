@@ -3,10 +3,13 @@ import os
 from src.config import OUTPUT_DIR, M3U_FILE, TXT_FILE
 
 def generate_m3u(classified: dict, output_path: str):
-    """生成标准 M3U 文件"""
+    """生成标准 M3U 文件，可按分组输出"""
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n")
         for category, channels in classified.items():
+            # 如果分类为空则跳过
+            if not channels:
+                continue
             f.write(f"\n# 分类: {category}\n")
             for ch in channels:
                 # 构建 EXTINF 行
@@ -25,6 +28,8 @@ def generate_txt(classified: dict, output_path: str):
     """生成 TXT 格式（分类注释 + URL 列表）"""
     with open(output_path, "w", encoding="utf-8") as f:
         for category, channels in classified.items():
+            if not channels:
+                continue
             f.write(f"\n# {category}\n")
             for ch in channels:
                 f.write(f"{ch['url']}\n")
