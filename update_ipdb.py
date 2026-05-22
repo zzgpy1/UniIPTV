@@ -7,8 +7,8 @@ import time
 
 # 优先使用的 CDN 源（您提供的地址）
 PRIMARY_URL = "https://cdn.1008.site/gh/nmgliangwei/qqwry@main/qqwry.dat"
-# 备用镜像源（GitCode）
-BACKUP_URL = "https://gitcode.com/qqwry/qqwry.dat/raw/main/qqwry.dat"
+# 备用镜像源（Github）
+BACKUP_URL = "https://raw.githubusercontent.com/FW27623/qqwry/main/qqwry.datt"
 
 MAX_RETRIES = 3
 RETRY_DELAY = 5
