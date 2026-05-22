@@ -1,0 +1,32 @@
+[
+    {
+        "name": "Guovin_iptv_api",
+        "url": "https://raw.githubusercontent.com/Guovin/iptv-api/main/output/result.m3u",
+        "type": "m3u",
+        "enabled": true
+    },
+    {
+        "name": "Collect_IPTV_best",
+        "url": "https://raw.githubusercontent.com/zilong7728/Collect-IPTV/main/best_sorted.m3u",
+        "type": "m3u",
+        "enabled": true
+    },
+    {
+        "name": "iptv-org_China",
+        "url": "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/CN.m3u",
+        "type": "m3u",
+        "enabled": true
+    },
+    {
+        "name": "Fanmingming_live",
+        "url": "https://raw.githubusercontent.com/fanmingming/live/main/tv/m3u/global.m3u",
+        "type": "m3u",
+        "enabled": true
+    },
+    {
+        "name": "YanG-1989_m3u",
+        "url": "https://raw.githubusercontent.com/YanG-1989/m3u/main/Gather.m3u",
+        "type": "m3u",
+        "enabled": true
+    }
+]
