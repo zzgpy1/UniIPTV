@@ -9,23 +9,20 @@ import time
 import logging
 from typing import List, Dict
 from pathlib import Path
-from collections import defaultdict
+from ip_locator import IPLocator
 
 logger = logging.getLogger(__name__)
 
 
 class SpeedTester:
-    """测速器（含缓存机制）"""
-    
-    def __init__(self, cache_dir: Path):
+    def __init__(self, cache_dir: Path, config_dir: Path):
         self.cache_dir = cache_dir
         self.cache_file = cache_dir / 'speed_cache.pkl'
         self.cache = self._load_cache()
+        self.ip_locator = IPLocator(config_dir)
         self.DEFAULT_TIMEOUT = 5
-        self.MIN_SPEED = 0.5
-    
+
     def _load_cache(self) -> Dict:
-        """加载测速缓存"""
         if self.cache_file.exists():
             try:
                 with open(self.cache_file, 'rb') as f:
@@ -33,122 +30,74 @@ class SpeedTester:
             except:
                 return {}
         return {}
-    
+
     def _save_cache(self):
-        """保存测速缓存"""
         try:
             with open(self.cache_file, 'wb') as f:
                 pickle.dump(self.cache, f)
-            logger.info(f"测速缓存已保存: {len(self.cache)} 条记录")
         except Exception as e:
-            logger.warning(f"缓存保存失败: {e}")
-    
-    async def _test_single_url(self, session: aiohttp.ClientSession, 
-                               stream: Dict) -> Dict:
-        """测试单个URL的延迟"""
+            logger.warning(f"保存缓存失败: {e}")
+
+    async def _test_one(self, session: aiohttp.ClientSession, stream: Dict) -> Dict:
         url = stream.get('url', '')
         name = stream.get('name', '')
-        cache_key = f"{name}|{url}"
-        
-        # 检查缓存
-        if cache_key in self.cache:
-            cached = self.cache[cache_key]
-            # 缓存有效期为 12 小时
+        key = f"{name}|{url}"
+        # 检查缓存（12小时）
+        if key in self.cache:
+            cached = self.cache[key]
             if time.time() - cached.get('timestamp', 0) < 12 * 3600:
-                logger.debug(f"缓存命中: {name[:30]}...")
-                stream['delay'] = cached.get('delay', float('inf'))
-                stream['is_alive'] = cached.get('is_alive', False)
+                stream['delay'] = cached['delay']
+                stream['is_alive'] = cached['is_alive']
+                stream['isp'] = cached.get('isp', 'Unknown')
                 return stream
-        
-        # 实际测速
+
+        # 测速
         try:
-            retry_options = aiohttp_retry.RetryOptions(
-                attempts=2,
-                statuses={408, 429, 500, 502, 503, 504}
-            )
-            retry_client = aiohttp_retry.RetryClient(
-                client=session,
-                retry_options=retry_options
-            )
-            
-            start_time = time.time()
-            async with retry_client.get(
-                url, 
-                timeout=aiohttp.ClientTimeout(total=self.DEFAULT_TIMEOUT),
-                headers={
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-            ) as resp:
-                delay = time.time() - start_time
-                
+            retry_opts = aiohttp_retry.RetryOptions(attempts=2)
+            retry_client = aiohttp_retry.RetryClient(client=session, retry_options=retry_opts)
+            start = time.time()
+            async with retry_client.get(url, timeout=self.DEFAULT_TIMEOUT) as resp:
+                delay = time.time() - start
                 if resp.status == 200:
                     stream['delay'] = delay
                     stream['is_alive'] = True
-                    
-                    # 更新缓存
-                    self.cache[cache_key] = {
+                    # 识别ISP
+                    stream['isp'] = self.ip_locator.get_isp(url)
+                    self.cache[key] = {
                         'delay': delay,
                         'is_alive': True,
+                        'isp': stream['isp'],
                         'timestamp': time.time()
                     }
-                    logger.debug(f"✅ {name[:30]}... {delay:.2f}s")
+                    logger.debug(f"✅ {name[:30]} {delay:.2f}s {stream['isp']}")
                 else:
                     stream['delay'] = float('inf')
                     stream['is_alive'] = False
-                    logger.debug(f"❌ {name[:30]}... HTTP {resp.status}")
-            
             await retry_client.close()
-            
-        except asyncio.TimeoutError:
+        except Exception:
             stream['delay'] = float('inf')
             stream['is_alive'] = False
-            logger.debug(f"⏱️ {name[:30]}... 超时")
-        except Exception as e:
-            stream['delay'] = float('inf')
-            stream['is_alive'] = False
-            logger.debug(f"⚠️ {name[:30]}... 错误: {type(e).__name__}")
-        
+
         return stream
-    
+
     async def test(self, streams: List[Dict]) -> List[Dict]:
-        """批量测速"""
         if not streams:
             return []
-        
-        logger.info(f"开始测速，共 {len(streams)} 个源")
-        
-        # 控制并发数
-        semaphore = asyncio.Semaphore(20)
-        
-        async def test_with_semaphore(session, stream):
-            async with semaphore:
-                return await self._test_single_url(session, stream)
-        
+        sem = asyncio.Semaphore(30)
         async with aiohttp.ClientSession() as session:
-            tasks = [test_with_semaphore(session, stream) for stream in streams]
+            tasks = []
+            for s in streams:
+                async def wrapped(stream):
+                    async with sem:
+                        return await self._test_one(session, stream)
+                tasks.append(wrapped(s))
             results = await asyncio.gather(*tasks)
-        
-        # 保存缓存
         self._save_cache()
-        
-        # 过滤有效的源
-        valid_streams = [s for s in results if s.get('is_alive', False)]
-        logger.info(f"测速完成: {len(valid_streams)}/{len(streams)} 个源有效")
-        
-        return valid_streams
-    
+        valid = [r for r in results if r.get('is_alive')]
+        logger.info(f"测速完成: {len(valid)}/{len(streams)} 个有效")
+        return valid
+
     def sort_by_delay(self, streams: List[Dict]) -> List[Dict]:
-        """按延迟排序"""
-        if not streams:
-            return []
-        
-        sorted_streams = sorted(streams, key=lambda x: x.get('delay', float('inf')))
-        
-        # 延迟统计
-        delays = [s.get('delay', 0) for s in sorted_streams if s.get('delay', 0) < float('inf')]
-        if delays:
-            avg_delay = sum(delays) / len(delays)
-            min_delay = min(delays)
-            logger.info(f"测速统计: 平均 {avg_delay:.2f}s, 最快 {min_delay:.2f}s")
-        
-        return sorted_streams
+        # 可以按延迟排序，也可以按运营商偏好（例如优先电信）
+        # 这里简单按延迟升序
+        return sorted(streams, key=lambda x: x.get('delay', float('inf')))
