@@ -1,0 +1,89 @@
+name: UniIPTV Update
+
+on:
+  schedule:
+    # 每日凌晨 2:00 (UTC) 自动运行，即北京时间 10:00
+    - cron: '0 2 * * *'
+  workflow_dispatch:              # 支持手动触发
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'config/**'
+
+jobs:
+  build-and-update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    permissions:
+      contents: write              # 允许推送代码到仓库
+      pages: write                # 允许部署到 GitHub Pages（可选）
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Cache Pip Dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Cache Speed Test Results
+        uses: actions/cache@v4
+        with:
+          path: .cache/speed_cache.pkl
+          key: speed-cache-${{ github.run_id }}
+          restore-keys: |
+            speed-cache-
+            speed-cache-${{ github.ref_name }}
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run UniIPTV Main Script
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python src/main.py
+
+      - name: Upload Output Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: iptv-output
+          path: output/
+          retention-days: 7
+
+      - name: Commit and Push Output Files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/ -f
+          git diff --staged --quiet || git commit -m "Auto update IPTV sources at $(date '+%Y-%m-%d %H:%M:%S')"
+          git push origin HEAD:main
+        continue-on-error: true
+
+      - name: Deploy to GitHub Pages (Optional)
+        if: success()
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./output
+          publish_branch: gh-pages
+          keep_files: false
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
