@@ -1,19 +1,9 @@
-# 核心依赖
 aiohttp>=3.9.0
+aiohttp-retry>=2.8.0
 aiofiles>=23.2.0
 requests>=2.31.0
-
-# 测速相关
-aiohttp-retry>=2.8.0
-asyncio>=3.4.3
-
-# 数据处理
 pandas>=2.0.0
 pydantic>=2.0.0
-
-# EPG 相关
 xmltodict>=0.13.0
 lxml>=4.9.0
-
-# 其他
-urllib3>=2.0.0
+qqwry-py3>=0.2.0
