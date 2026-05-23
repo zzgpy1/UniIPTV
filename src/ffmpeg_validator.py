@@ -30,14 +30,16 @@ async def check_ffprobe() -> bool:
         _ffprobe_available = False
         return False
 
-async def validate_with_ffprobe(channel) -> bool:
-    """使用 ffprobe 检测流是否包含有效的视频或音频流（容错版）"""
+async def validate_with_ffprobe(channel) -> dict:
+    """
+    增强版：使用 ffprobe 深度解析流信息
+    返回格式：{"valid": bool, "has_video": bool, "video_codec": str, "has_audio": bool}
+    """
     if not FFMPEG_ENABLE:
-        return True  # 未启用深度验证，默认通过
+        return {"valid": True, "has_video": True, "video_codec": "unknown", "has_audio": True}
 
-    # 如果 ffprobe 不可用，直接返回 True（只依赖 HTTP 测速）
     if not await check_ffprobe():
-        return True
+        return {"valid": True, "has_video": True, "video_codec": "unknown", "has_audio": True}
 
     cmd = [
         "ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams",
@@ -50,35 +52,32 @@ async def validate_with_ffprobe(channel) -> bool:
         )
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=TIMEOUT)
         if proc.returncode != 0:
-            # 非零返回码：可能是流不可读、格式不支持等
-            if FFMPEG_STRICT:
-                return False
-            else:
-                # 宽松模式：认为有效（已通过 HTTP 测速）
-                return True
+            return {"valid": not FFMPEG_STRICT, "has_video": False, "video_codec": "", "has_audio": False}
 
         data = json.loads(stdout.decode('utf-8', errors='ignore'))
         streams = data.get("streams", [])
-        has_video = any(s.get("codec_type") == "video" for s in streams)
+        has_video = False
+        video_codec = ""
+        for s in streams:
+            if s.get("codec_type") == "video":
+                has_video = True
+                video_codec = s.get("codec_name", "").lower()
+                break
         has_audio = any(s.get("codec_type") == "audio" for s in streams)
-        # 至少需要有音频或视频流
+
+        # 优先保留 H.264 编码的源，如果是 H.265 且非严格模式也保留
         valid = has_video or has_audio
         if not valid and not FFMPEG_STRICT:
-            # 宽松模式下，无音视频流也认为有效（避免误杀）
             valid = True
-        return valid
-    except asyncio.TimeoutError:
-        # 超时：流可能较慢，宽松模式下视为有效
-        if FFMPEG_STRICT:
-            return False
-        else:
-            return True
-    except Exception as e:
-        # 其他异常（如 json 解析错误），宽松模式下视为有效
-        if FFMPEG_STRICT:
-            return False
-        else:
-            return True
+
+        return {
+            "valid": valid,
+            "has_video": has_video,
+            "video_codec": video_codec,
+            "has_audio": has_audio
+        }
+    except Exception:
+        return {"valid": not FFMPEG_STRICT, "has_video": False, "video_codec": "", "has_audio": False}
 
 async def validate_batch(channels: list) -> list:
     """对列表中的频道进行批量深度验证（并发有限制）"""
