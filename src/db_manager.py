@@ -3,7 +3,7 @@ import sqlite3
 import json
 import hashlib
 from datetime import datetime
-from typing import List, Any, Optional
+from typing import List, Dict, Any, Optional
 
 DB_PATH = "iptv_cache.db"
 
@@ -14,7 +14,7 @@ class DatabaseManager:
 
     def _init_tables(self):
         cursor = self.conn.cursor()
-        -- 创建源数据哈希表
+        # 源数据哈希表
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS source_hash (
                 source_url TEXT PRIMARY KEY,
@@ -22,7 +22,7 @@ class DatabaseManager:
                 last_updated TIMESTAMP
             )
         ''')
-        -- 创建频道缓存表
+        # 频道缓存表
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS channels (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,6 +80,7 @@ class DatabaseManager:
         rows = cursor.fetchall()
         channels = []
         for row in rows:
+            # 创建一个简单的对象
             ch = type('Channel', (), {})()
             ch.name = row[0]
             ch.url = row[1]
