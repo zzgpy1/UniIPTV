@@ -1,5 +1,5 @@
 # src/classifier.py
-# 智能分类模块（增强地方频道识别）
+# 智能分类模块（支持字典和对象输入）
 
 from src.config import CATEGORY_KEYWORDS, CCTV_ORDER
 
@@ -14,13 +14,20 @@ PROVINCES = [
     "香港", "澳门"
 ]
 
-# 市级名称常见后缀（用于匹配城市频道）
+# 市级名称常见后缀
 CITY_SUFFIX = ["市", "州", "地区", "盟"]
 
+def get_channel_attribute(ch, attr, default=""):
+    """兼容获取频道属性（支持字典和对象）"""
+    if isinstance(ch, dict):
+        return ch.get(attr, default)
+    else:
+        return getattr(ch, attr, default)
+
 def classify_channel(channel) -> str:
-    """根据 group-title 或频道名匹配分类，增强地方识别"""
-    name = getattr(channel, 'name', '')
-    group = getattr(channel, 'group_title', '')
+    """根据 group-title 或频道名匹配分类（兼容字典和对象）"""
+    name = get_channel_attribute(channel, 'name', '')
+    group = get_channel_attribute(channel, 'group_title', '')
     
     # 优先使用 group-title
     if group:
@@ -48,7 +55,6 @@ def classify_channel(channel) -> str:
     for suffix in CITY_SUFFIX:
         if suffix in name:
             return "地方"
-    # 常见地方频道关键词
     if any(k in name for k in ["电视台", "综合频道", "公共频道", "生活频道", "新闻综合"]):
         return "地方"
     
@@ -76,13 +82,17 @@ def classify_all(channels: list) -> dict:
         if cat not in classified:
             classified[cat] = []
         
-        # 转换为字典（兼容 Channel 和 MergedChannel）
-        if hasattr(ch, 'to_dict'):
-            ch_dict = ch.to_dict()
+        # 转换为统一字典格式（确保有 name, url, urls, group_title 等字段）
+        if isinstance(ch, dict):
+            ch_dict = ch.copy()
+            # 确保 urls 字段存在（如果没有，则用 url 构造）
+            if "urls" not in ch_dict:
+                ch_dict["urls"] = [ch_dict.get("url", "")]
         else:
+            # 对象转字典
             ch_dict = {
                 "name": getattr(ch, 'name', ''),
-                "url": getattr(ch, 'urls', [getattr(ch, 'url', '')])[0] if hasattr(ch, 'urls') else getattr(ch, 'url', ''),
+                "url": getattr(ch, 'url', ''),
                 "urls": getattr(ch, 'urls', [getattr(ch, 'url', '')]),
                 "group_title": getattr(ch, 'group_title', ''),
                 "id": getattr(ch, 'tvg_id', ''),
@@ -105,18 +115,20 @@ def classify_all(channels: list) -> dict:
         
         if cat == "央视":
             def ctv_key(ch):
-                name = ch["name"]
+                name = ch.get("name", "")
                 for idx, standard_name in enumerate(CCTV_ORDER):
                     if standard_name.lower() in name.lower() or name.lower() in standard_name.lower():
                         return idx
                 return len(CCTV_ORDER)
             result[cat] = sorted(classified[cat], key=ctv_key)
         else:
-            result[cat] = sorted(classified[cat], key=lambda x: x["name"])
+            result[cat] = sorted(classified[cat], key=lambda x: x.get("name", ""))
     
     # 输出统计
     print("📊 分类统计：")
     for cat, lst in result.items():
         if lst:
             print(f"  {cat}: {len(lst)} 个频道")
+        else:
+            print(f"  {cat}: 0 个频道")
     return result
