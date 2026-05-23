@@ -1,12 +1,27 @@
 # src/generator.py
-# 输出生成：M3U 和 TXT 格式（支持多源合并后的频道对象）
+# 输出生成：M3U 和 TXT 格式（清理频道名，只输出最优源）
 
 import os
+import re
 from src.config import OUTPUT_DIR, M3U_FILE, TXT_FILE
+
+def clean_channel_name(name: str) -> str:
+    """
+    清理频道名：去掉分辨率标签（720p、1080p、4K等）、去掉多余空格、去掉备用源后缀
+    例如: "CCTV-1 1080p" -> "CCTV-1"
+         "湖南卫视(备1)" -> "湖南卫视"
+    """
+    # 去除常见的清晰度标签
+    name = re.sub(r'\s*(?:1080[pi]|720[pi]|4K|8K|HD|高清|超清|标清|流畅|付费|备\d*)\s*', '', name, flags=re.IGNORECASE)
+    # 去除括号及内容（如“(HD)”）
+    name = re.sub(r'[（(][^）)]*[）)]', '', name)
+    # 去除多余空格
+    name = re.sub(r'\s+', ' ', name).strip()
+    return name
 
 def generate_m3u(classified: dict, output_path: str):
     """
-    生成标准 M3U 文件，支持一个频道多个 URL（备源）
+    生成标准 M3U 文件，每个频道只输出最优的一个源（无备用源后缀，无分辨率标签）
     classified 格式：{分类名称: [channel_dict, ...]}
     """
     with open(output_path, "w", encoding="utf-8") as f:
@@ -16,35 +31,31 @@ def generate_m3u(classified: dict, output_path: str):
                 continue
             f.write(f"\n# 分类: {category}\n")
             for ch in channels:
-                # 获取 URL 列表（兼容旧格式单个 url 或新格式 urls 列表）
-                if "urls" in ch and isinstance(ch["urls"], list):
-                    urls = ch["urls"]
+                # 获取最优 URL（第一个即为合并排序后的最优）
+                if "urls" in ch and ch["urls"]:
+                    url = ch["urls"][0]
                 elif "url" in ch:
-                    urls = [ch["url"]]
+                    url = ch["url"]
                 else:
-                    urls = []
+                    continue
                 
-                for idx, url in enumerate(urls):
-                    if idx == 0:
-                        # 第一个源使用完整信息
-                        extinf = f'#EXTINF:-1'
-                        if ch.get("id"):
-                            extinf += f' tvg-id="{ch["id"]}"'
-                        if ch.get("logo"):
-                            extinf += f' tvg-logo="{ch["logo"]}"'
-                        if category:
-                            extinf += f' group-title="{category}"'
-                        extinf += f',{ch["name"]}\n'
-                        f.write(extinf)
-                    else:
-                        # 备用源简写，便于播放器识别
-                        f.write(f'#EXTINF:-1 group-title="{category}",{ch["name"]} (备{idx})\n')
-                    f.write(f"{url}\n")
+                # 清理频道名
+                clean_name = clean_channel_name(ch["name"])
+                
+                extinf = f'#EXTINF:-1'
+                if ch.get("id"):
+                    extinf += f' tvg-id="{ch["id"]}"'
+                if ch.get("logo"):
+                    extinf += f' tvg-logo="{ch["logo"]}"'
+                if category:
+                    extinf += f' group-title="{category}"'
+                extinf += f',{clean_name}\n'
+                f.write(extinf)
+                f.write(f"{url}\n")
 
 def generate_txt(classified: dict, output_path: str):
     """
-    生成 TXT 格式（分类注释 + URL 列表）
-    注意：TXT 格式无法表达多源，只输出每个频道的第一个 URL
+    生成 TXT 格式（分类注释 + URL 列表），只输出最优源
     """
     with open(output_path, "w", encoding="utf-8") as f:
         for category, channels in classified.items():
@@ -52,7 +63,6 @@ def generate_txt(classified: dict, output_path: str):
                 continue
             f.write(f"\n# {category}\n")
             for ch in channels:
-                # 取第一个可用 URL
                 if "urls" in ch and ch["urls"]:
                     url = ch["urls"][0]
                 elif "url" in ch:
