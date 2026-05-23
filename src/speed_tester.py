@@ -1,4 +1,6 @@
-# 轻量级 HTTP 头探测（快速测速，增加 IP 解析）
+# src/speed_tester.py
+# 轻量级 HTTP 头探测（快速测速），集成 IP 解析
+
 import asyncio
 import aiohttp
 import time
@@ -19,8 +21,6 @@ async def probe_channel(session, channel):
                     resolver = get_resolver()
                     if resolver.is_available:
                         ip_info = resolver.resolve_channel_ip(channel)
-                        if ip_info:
-                            print(f"  📍 {channel.name}: {ip_info['ip']} -> {ip_info['province']} {ip_info['isp']}")
                 return channel, latency, True, ip_info
             else:
                 return channel, latency, False, None
@@ -48,11 +48,9 @@ async def test_channels_concurrent(channels_dict: dict) -> list:
             ch.latency = latency
             if ip_info:
                 ch.ip_info = ip_info
-            else:
-                ch.ip_info = None
             valid.append(ch)
     
     # 按延迟排序（升序）
-    valid.sort(key=lambda x: getattr(x, 'latency', 9999))
+    valid.sort(key=lambda x: x.latency)
     print(f"✅ 测速完成，有效频道 {len(valid)}/{len(channels)}")
     return valid
