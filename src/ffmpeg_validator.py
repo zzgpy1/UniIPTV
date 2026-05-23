@@ -120,12 +120,13 @@ async def validate_batch(channels: list) -> list:
 
     async def validate_one(ch):
         async with semaphore:
-            result = await validate_with_ffprobe(ch)
-            # 将结果存储到 channel 对象
-            ch.video_codec = result.get('video_codec', 'unknown')
-            ch.has_video = result.get('has_video', False)
-            ch.has_audio = result.get('has_audio', False)
-            return ch, result['valid']
+            info = await validate_with_ffprobe(ch)
+            if info["valid"]:
+                # 确保 video_codec 属性已设置（validate_with_ffprobe 内部已设置，这里再确认一次）
+                ch.video_codec = info.get("video_codec", "unknown")
+                return ch, True
+            else:
+                return ch, False
 
     tasks = [validate_one(ch) for ch in channels]
     results = await asyncio.gather(*tasks)
@@ -136,11 +137,7 @@ async def validate_batch(channels: list) -> list:
     if invalid_count > 0 and not FFMPEG_STRICT:
         print(f"   （宽松模式，{invalid_count} 个异常或超时频道已保留）")
     return valid
-    invalid_count = len(channels) - len(valid)
-    print(f"🔍 ffmpeg 深度验证完成，通过 {len(valid)}/{len(channels)} 个频道")
-    if invalid_count > 0 and not FFMPEG_STRICT:
-        print(f"   （宽松模式，{invalid_count} 个异常或超时频道已保留）")
-    return valid
 
+# 对外入口
 async def validate_with_ffmpeg_batch(channels: list) -> list:
     return await validate_batch(channels)
