@@ -3,12 +3,24 @@ import asyncio
 import aiohttp
 import time
 from src.config import HEADERS, TIMEOUT, RETRY_MAX_ATTEMPTS, RETRY_BACKOFF_FACTOR, RETRY_MAX_WAIT, ENABLE_RETRY
+from src.database import get_db_cache
+from src.config import DATABASE_ENABLE
 
 class FetchError(Exception):
     pass
 
 async def fetch_url(session, url: str) -> str:
-    """异步拉取单个 URL 内容，带手动指数退避重试"""
+    """异步拉取单个 URL 内容，支持缓存读取和保存"""
+    
+    # 1. 尝试从缓存读取
+    if DATABASE_ENABLE:
+        db = await get_db_cache()
+        cached_content = await db.get_raw_source(url)
+        if cached_content is not None:
+            print(f"📦 使用缓存: {url}")
+            return cached_content
+    
+    # 2. 缓存未命中，执行实际拉取
     attempt = 0
     last_exception = None
 
@@ -21,7 +33,14 @@ async def fetch_url(session, url: str) -> str:
     while True:
         attempt += 1
         try:
-            return await _fetch()
+            content = await _fetch()
+            
+            # 3. 保存到缓存
+            if DATABASE_ENABLE:
+                db = await get_db_cache()
+                await db.set_raw_source(url, content)
+            
+            return content
         except Exception as e:
             last_exception = e
             if not ENABLE_RETRY or attempt >= RETRY_MAX_ATTEMPTS:
