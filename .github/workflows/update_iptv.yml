@@ -2,8 +2,8 @@ name: "IPTV 源智能更新与整理"
 
 on:
   schedule:
-    - cron: "0 */6 * * *"
-  workflow_dispatch:
+    - cron: "0 */6 * * *"    # 每6小时运行一次
+  workflow_dispatch:          # 支持手动触发
 
 permissions:
   contents: write
@@ -29,7 +29,25 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # 移除 ffmpeg 缓存，改为直接安装
+      # 新增：缓存 IPTV 数据库文件（使用 GitHub Actions 原生缓存）
+      - name: 缓存 IPTV 数据库
+        id: cache-db
+        uses: actions/cache@v4
+        with:
+          path: iptv_cache.db
+          key: ${{ runner.os }}-iptv-cache-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-iptv-cache-
+
+      # 新增：显示缓存命中状态
+      - name: 显示数据库缓存状态
+        run: |
+          if [ -f "iptv_cache.db" ]; then
+            echo "✅ 数据库缓存已恢复，文件大小: $(ls -lh iptv_cache.db | awk '{print $5}')"
+          else
+            echo "⚠️ 未找到数据库缓存，将新建数据库"
+          fi
+
       - name: 安装 ffmpeg（包含 ffprobe）
         run: |
           sudo apt-get update
@@ -41,27 +59,28 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-       # 缓存 IP 数据库
+      # 缓存 IP 数据库（纯真IP库）
       - name: 缓存 IP 数据库
         id: cache-ipdb
         uses: actions/cache@v4
         with:
           path: qqwry.dat
           key: ${{ runner.os }}-qqwry-dat
+          restore-keys: |
+            ${{ runner.os }}-qqwry-dat
 
-      # 更新 IP 数据库（移除条件判断，每次都运行）
+      # 更新 IP 数据库
       - name: 更新 IP 数据库
         run: python update_ipdb.py
-        continue-on-error: true   # 更新失败也继续运行（会使用已有缓存）
+        continue-on-error: true
 
-      # 验证数据库文件存在
       - name: 验证数据库文件
         run: |
           if [ -f "qqwry.dat" ]; then
             echo "✅ IP 数据库文件存在"
             ls -lh qqwry.dat
           else
-            echo "⚠️ IP 数据库文件不存在，IP 归属地解析将不可用"
+            echo "⚠️ IP 数据库文件不存在，将跳过 IP 归属地解析"
           fi
 
       - name: 执行 IPTV 更新脚本
