@@ -9,6 +9,7 @@ IPTV_SOURCES = [
     "https://raw.githubusercontent.com/vbskycn/iptv/master/tv/iptv4.txt",
     "https://raw.githubusercontent.com/zzgpy1/Collect-IPTV/main/best_sorted.m3u",
     "https://raw.githubusercontent.com/dogwalkerg/IPTV-collect-tv-txt/main/others_output.txt",
+    "https://raw.githubusercontent.com/zzgpy1/iptv-hybrid/main/iptv.m3u",
 ]
 
 # 并发线程数 / 超时（秒）
