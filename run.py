@@ -108,27 +108,27 @@ async def main():
         print("❌ 深度验证后无有效频道")
         sys.exit(1)
 
-    # 5 合并多源频道 (新增)
-    from src.merger import merge_channels_by_name
+    # 4.5 合并多源频道
     print("🔄 正在合并多源频道...")
+    from src.merger import merge_channels_by_name
     valid_channels = merge_channels_by_name(valid_channels)
     
-    # 6. 按地域筛选（新增）
+    # 5. 按地域筛选（新增）
     valid_channels = filter_by_region(valid_channels)
     
     if not valid_channels:
         print("❌ 地域筛选后无有效频道")
         sys.exit(1)
     
-    # 7. 智能分类
+     # 6. 智能分类
     print("📁 执行智能分类...")
     classified = classify_all(valid_channels)
     
-    # 8. 按 demo.txt 过滤和重排
+    # 7. 按 demo.txt 过滤和重排
     print("🎯 根据 demo.txt 过滤频道并重排顺序...")
     classified = filter_and_reorder(classified)
     
-    # 9. 生成输出文件
+    # 8. 生成输出文件
     generate_outputs(classified)
     
     total = sum(len(lst) for lst in classified.values())
