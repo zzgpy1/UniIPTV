@@ -11,9 +11,14 @@ class Channel:
         self.tvg_id = tvg_id
         self.tvg_name = tvg_name
         self.tvg_logo = tvg_logo
+        # 新增属性：测速延迟、IP信息、视频编码等
+        self.latency = None
+        self.ip_info = None
+        self.video_codec = None
+        self.has_video = False
+        self.has_audio = False
 
     def key(self) -> str:
-        """去重键：频道名 + URL"""
         return f"{self.name}|{self.url}"
 
     def to_dict(self):
@@ -22,7 +27,11 @@ class Channel:
             "url": self.url,
             "group_title": self.group_title,
             "id": self.tvg_id,
-            "logo": self.tvg_logo
+            "logo": self.tvg_logo,
+            "latency": self.latency,
+            "video_codec": self.video_codec,
+            "has_video": self.has_video,
+            "has_audio": self.has_audio
         }
 
 def parse_m3u(content: str) -> list:
