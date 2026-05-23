@@ -1,14 +1,12 @@
-# ffmpeg/ffprobe 深度验证模块（容错增强版）
+# src/ffmpeg_validator.py
 import asyncio
 import subprocess
 import json
 from src.config import FFMPEG_ENABLE, TIMEOUT, MAX_WORKERS, FFMPEG_STRICT
 
-# 全局检查 ffprobe 是否可用
 _ffprobe_available = None
 
 async def check_ffprobe() -> bool:
-    """检查 ffprobe 命令是否可用"""
     global _ffprobe_available
     if _ffprobe_available is not None:
         return _ffprobe_available
@@ -30,15 +28,23 @@ async def check_ffprobe() -> bool:
         _ffprobe_available = False
         return False
 
-async def validate_with_ffprobe(channel) -> dict:
+async def validate_with_ffprobe(channel):
     """
     增强版：使用 ffprobe 深度解析流信息
-    返回格式：{"valid": bool, "has_video": bool, "video_codec": str, "has_audio": bool}
+    返回字典，并同时将信息附加到 channel 对象上
     """
     if not FFMPEG_ENABLE:
+        channel.video_codec = "unknown"
+        channel.has_video = True
+        channel.has_audio = True
+        channel.ffmpeg_valid = True
         return {"valid": True, "has_video": True, "video_codec": "unknown", "has_audio": True}
 
     if not await check_ffprobe():
+        channel.video_codec = "unknown"
+        channel.has_video = True
+        channel.has_audio = True
+        channel.ffmpeg_valid = True
         return {"valid": True, "has_video": True, "video_codec": "unknown", "has_audio": True}
 
     cmd = [
@@ -52,7 +58,12 @@ async def validate_with_ffprobe(channel) -> dict:
         )
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=TIMEOUT)
         if proc.returncode != 0:
-            return {"valid": not FFMPEG_STRICT, "has_video": False, "video_codec": "", "has_audio": False}
+            valid = not FFMPEG_STRICT
+            channel.ffmpeg_valid = valid
+            channel.has_video = False
+            channel.video_codec = ""
+            channel.has_audio = False
+            return {"valid": valid, "has_video": False, "video_codec": "", "has_audio": False}
 
         data = json.loads(stdout.decode('utf-8', errors='ignore'))
         streams = data.get("streams", [])
@@ -65,10 +76,15 @@ async def validate_with_ffprobe(channel) -> dict:
                 break
         has_audio = any(s.get("codec_type") == "audio" for s in streams)
 
-        # 优先保留 H.264 编码的源，如果是 H.265 且非严格模式也保留
         valid = has_video or has_audio
         if not valid and not FFMPEG_STRICT:
             valid = True
+
+        # 附加到 channel 对象
+        channel.ffmpeg_valid = valid
+        channel.has_video = has_video
+        channel.video_codec = video_codec
+        channel.has_audio = has_audio
 
         return {
             "valid": valid,
@@ -76,38 +92,62 @@ async def validate_with_ffprobe(channel) -> dict:
             "video_codec": video_codec,
             "has_audio": has_audio
         }
+    except asyncio.TimeoutError:
+        valid = not FFMPEG_STRICT
+        channel.ffmpeg_valid = valid
+        channel.has_video = False
+        channel.video_codec = ""
+        channel.has_audio = False
+        return {"valid": valid, "has_video": False, "video_codec": "", "has_audio": False}
     except Exception:
-        return {"valid": not FFMPEG_STRICT, "has_video": False, "video_codec": "", "has_audio": False}
+        valid = not FFMPEG_STRICT
+        channel.ffmpeg_valid = valid
+        channel.has_video = False
+        channel.video_codec = ""
+        channel.has_audio = False
+        return {"valid": valid, "has_video": False, "video_codec": "", "has_audio": False}
 
 async def validate_batch(channels: list) -> list:
-    """对列表中的频道进行批量深度验证（并发有限制）"""
+    """对列表中的频道进行批量深度验证（并发有限制），并更新 channel 属性"""
     if not FFMPEG_ENABLE:
         print("⚙️ ffmpeg 深度验证未启用，跳过")
+        # 为每个 channel 添加默认属性
+        for ch in channels:
+            ch.ffmpeg_valid = True
+            ch.has_video = True
+            ch.video_codec = "unknown"
+            ch.has_audio = True
         return channels
 
-    # 预检 ffprobe 可用性
     ffprobe_ok = await check_ffprobe()
     if not ffprobe_ok:
         print("⚠️ ffprobe 不可用，跳过深度验证，全部频道视为有效")
+        for ch in channels:
+            ch.ffmpeg_valid = True
+            ch.has_video = True
+            ch.video_codec = "unknown"
+            ch.has_audio = True
         return channels
 
-    semaphore = asyncio.Semaphore(min(MAX_WORKERS, 5))  # ffprobe 较重，降低并发
+    semaphore = asyncio.Semaphore(min(MAX_WORKERS, 5))
 
     async def validate_one(ch):
         async with semaphore:
-            is_valid = await validate_with_ffprobe(ch)
-            return ch, is_valid
+            return await validate_with_ffprobe(ch), ch
 
     tasks = [validate_one(ch) for ch in channels]
     results = await asyncio.gather(*tasks)
 
-    valid = [ch for ch, ok in results if ok]
+    valid = []
+    for res, ch in results:
+        if res["valid"]:
+            valid.append(ch)
+
     invalid_count = len(channels) - len(valid)
     print(f"🔍 ffmpeg 深度验证完成，通过 {len(valid)}/{len(channels)} 个频道")
     if invalid_count > 0 and not FFMPEG_STRICT:
         print(f"   （宽松模式，{invalid_count} 个异常或超时频道已保留）")
     return valid
 
-# 对外提供统一入口
 async def validate_with_ffmpeg_batch(channels: list) -> list:
     return await validate_batch(channels)
