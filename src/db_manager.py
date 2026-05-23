@@ -3,7 +3,7 @@ import sqlite3
 import json
 import hashlib
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Any, Optional
 
 DB_PATH = "iptv_cache.db"
 
@@ -14,7 +14,7 @@ class DatabaseManager:
 
     def _init_tables(self):
         cursor = self.conn.cursor()
-        # 源数据哈希表（记录每个源的哈希值）
+        -- 创建源数据哈希表
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS source_hash (
                 source_url TEXT PRIMARY KEY,
@@ -22,7 +22,7 @@ class DatabaseManager:
                 last_updated TIMESTAMP
             )
         ''')
-        # 频道缓存表
+        -- 创建频道缓存表
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS channels (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,7 +32,7 @@ class DatabaseManager:
                 video_codec TEXT,
                 group_title TEXT,
                 tvg_id TEXT,
-                ip_info TEXT,      # JSON 字符串
+                ip_info TEXT,
                 last_verified TIMESTAMP,
                 UNIQUE(name, url)
             )
@@ -54,7 +54,6 @@ class DatabaseManager:
         self.conn.commit()
 
     def save_channels(self, channels: List[Any]):
-        """保存频道列表（每个 Channel 对象）"""
         cursor = self.conn.cursor()
         for ch in channels:
             ip_info_json = json.dumps(getattr(ch, 'ip_info', None) or {})
@@ -72,8 +71,7 @@ class DatabaseManager:
             ))
         self.conn.commit()
 
-    def load_all_channels(self) -> List[Dict]:
-        """加载所有缓存频道，返回字典列表"""
+    def load_all_channels(self) -> List[Any]:
         cursor = self.conn.cursor()
         cursor.execute('''
             SELECT name, url, latency, video_codec, group_title, tvg_id, ip_info
@@ -94,7 +92,6 @@ class DatabaseManager:
         return channels
 
     def clear_cache(self):
-        """清空缓存（用于强制刷新）"""
         cursor = self.conn.cursor()
         cursor.execute("DELETE FROM channels")
         cursor.execute("DELETE FROM source_hash")
