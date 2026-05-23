@@ -4,11 +4,11 @@
 import os
 from src.config import OUTPUT_DIR, M3U_FILE, TXT_FILE
 
+
 def generate_m3u(classified: dict, output_path: str):
     """
     生成标准 M3U 文件，支持多源（每个频道多个备选URL）
-    分类参数 classified 格式: {分类名: [频道对象字典列表]}
-    每个频道字典应包含 'name', 'urls' (列表), 'group_title', 'id', 'logo' 等
+    classified 格式: {分类名: [MergedChannel 对象列表]}
     """
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n")
@@ -17,26 +17,40 @@ def generate_m3u(classified: dict, output_path: str):
                 continue
             f.write(f"\n# 分类: {category}\n")
             for ch in channels:
-                # 兼容合并后的频道（有 urls 列表）和普通频道（有 url 字符串）
-                urls = ch.get('urls') if ch.get('urls') else [ch.get('url', '')]
+                # 处理 MergedChannel 对象
+                if hasattr(ch, 'urls'):
+                    # MergedChannel 对象
+                    urls = ch.urls
+                    name = ch.name
+                    tvg_id = getattr(ch, 'tvg_id', '')
+                    tvg_logo = getattr(ch, 'tvg_logo', '')
+                else:
+                    # 字典类型（兼容旧格式）
+                    urls = ch.get('urls') if ch.get('urls') else [ch.get('url', '')]
+                    name = ch.get('name', '')
+                    tvg_id = ch.get('id', '')
+                    tvg_logo = ch.get('logo', '')
+                
                 if not urls:
                     continue
+                
                 # 第一个源使用完整标签
                 extinf = f'#EXTINF:-1'
-                if ch.get('id'):
-                    extinf += f' tvg-id="{ch["id"]}"'
-                if ch.get('logo'):
-                    extinf += f' tvg-logo="{ch["logo"]}"'
+                if tvg_id:
+                    extinf += f' tvg-id="{tvg_id}"'
+                if tvg_logo:
+                    extinf += f' tvg-logo="{tvg_logo}"'
                 if category:
                     extinf += f' group-title="{category}"'
-                extinf += f',{ch["name"]}\n'
+                extinf += f',{name}\n'
                 f.write(extinf)
                 f.write(f"{urls[0]}\n")
-                # 如果有备用源，为每个备用源添加一行（只写URL，播放器会自动尝试）
+                
+                # 备用源（每个备用源单独一行）
                 for idx, url in enumerate(urls[1:], start=1):
-                    # 可选：添加注释行说明备用源
-                    f.write(f'#EXTINF:-1 group-title="{category}",备用源{idx}:{ch["name"]}\n')
+                    f.write(f'#EXTINF:-1 group-title="{category}",备用源{idx}:{name}\n')
                     f.write(f"{url}\n")
+
 
 def generate_txt(classified: dict, output_path: str):
     """
@@ -49,9 +63,14 @@ def generate_txt(classified: dict, output_path: str):
                 continue
             f.write(f"\n# {category}\n")
             for ch in channels:
-                url = ch.get('urls', [ch.get('url', '')])[0]
+                # 处理 MergedChannel 对象
+                if hasattr(ch, 'urls'):
+                    url = ch.urls[0] if ch.urls else ''
+                else:
+                    url = ch.get('urls', [ch.get('url', '')])[0]
                 if url:
                     f.write(f"{url}\n")
+
 
 def generate_outputs(classified: dict):
     """生成所有输出文件，并确保输出目录存在"""
