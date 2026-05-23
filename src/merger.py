@@ -1,75 +1,53 @@
-import re
+# src/merger.py
+# 频道合并模块：按名称合并多源，排序后只保留最优源用于输出（但内部排序供筛选）
+
 from collections import defaultdict
+import re
 
 def normalize_channel_name(name: str) -> str:
-    """标准化频道名：去除清晰度标识、标点，转为小写（中文不变）"""
-    name = re.sub(r'[\(\[]?(?:高清|HD|超清|4K|标清|流畅|官方|备胎|备用)[\]\)]?', '', name, flags=re.IGNORECASE)
+    """标准化频道名，用于合并不同来源的同一频道（去除清晰度标签等）"""
+    name = re.sub(r'\s*(?:1080[pi]|720[pi]|4K|8K|HD|高清|超清|标清|流畅|付费)\s*', '', name, flags=re.IGNORECASE)
+    name = re.sub(r'[（(][^）)]*[）)]', '', name)
     name = re.sub(r'[^\w\u4e00-\u9fa5]', '', name)
     return name.strip()
 
-def merge_channels_by_name(channels: list) -> list:
+def merge_channels_by_name(valid_channels: list) -> list:
     """
-    按标准化频道名合并多源，每个频道保留最多5个最优源
-    最优策略：延迟最低 > H.264编码 > 省份匹配（相同省份优先）
+    按频道名合并多源，为每个频道保留最多 MAX_SOURCES_PER_CHANNEL 个源，
+    并按优先级排序（H.264 > H.265 > 其他，延迟低优先）。
+    返回的频道对象包含 urls 列表（按优先级排序）
     """
+    from src.config import MAX_SOURCES_PER_CHANNEL, PREFER_H264
+    
     groups = defaultdict(list)
-    for ch in channels:
-        # ch 可以是原始Channel对象或数据库返回的dict
-        if isinstance(ch, dict):
-            name = ch.get('name', '')
-            norm_name = normalize_channel_name(name)
-            groups[norm_name].append(ch)
-        else:
-            norm_name = normalize_channel_name(ch.name)
-            groups[norm_name].append(ch)
-
+    for ch in valid_channels:
+        norm_name = normalize_channel_name(ch.name)
+        groups[norm_name].append(ch)
+    
     merged_channels = []
-    for norm_name, items in groups.items():
-        # 排序规则：延迟升序，编码h264优先，省份匹配（如果有preferred_province）
-        def sort_key(item):
-            if isinstance(item, dict):
-                latency = item.get('latency', 9999)
-                codec = item.get('video_codec', '')
-                province = item.get('province', '')
-            else:
-                latency = getattr(item, 'latency', 9999)
-                codec = getattr(item, 'video_codec', '')
-                province = getattr(item, 'province', '')
-            # 编码优先级: h264=0, hevc=1, 其他=2
+    for norm_name, channels in groups.items():
+        # 排序：优先 H.264，然后延迟低
+        def sort_key(ch):
+            codec = getattr(ch, 'video_codec', '')
             codec_priority = 0 if codec == 'h264' else 1 if codec == 'hevc' else 2
-            # 省份匹配（暂时无法动态获取用户省份，可留空或从环境变量读取）
-            # 这里简单按延迟排序
+            latency = getattr(ch, 'latency', 9999)
             return (codec_priority, latency)
-        items.sort(key=sort_key)
-        top_items = items[:5]
-
-        # 构造合并后的频道对象（使用第一个作为主要信息）
-        first = top_items[0]
-        if isinstance(first, dict):
-            merged = type('MergedChannel', (), {})()
-            merged.name = first['name']
-            merged.urls = [item['url'] if isinstance(item, dict) else item.url for item in top_items]
-            merged.latency = first.get('latency', 0)
-            merged.video_codec = first.get('video_codec', '')
-            merged.group_title = first.get('group_title', '')
-            merged.tvg_id = first.get('tvg_id', '')
-            merged.tvg_logo = first.get('tvg_logo', '')
-            merged.province = first.get('province', '')
-            merged.city = first.get('city', '')
-            merged.isp = first.get('isp', '')
-        else:
-            merged = type('MergedChannel', (), {})()
-            merged.name = first.name
-            merged.urls = [item.url for item in top_items]
-            merged.latency = first.latency if hasattr(first, 'latency') else 0
-            merged.video_codec = getattr(first, 'video_codec', '')
-            merged.group_title = getattr(first, 'group_title', '')
-            merged.tvg_id = getattr(first, 'tvg_id', '')
-            merged.tvg_logo = getattr(first, 'tvg_logo', '')
-            merged.province = getattr(first, 'province', '')
-            merged.city = getattr(first, 'city', '')
-            merged.isp = getattr(first, 'isp', '')
+        
+        channels.sort(key=sort_key)
+        top_channels = channels[:MAX_SOURCES_PER_CHANNEL]
+        
+        # 创建合并后的频道对象（使用第一个频道作为模板）
+        primary = top_channels[0]
+        merged = type('MergedChannel', (), {})()
+        merged.name = primary.name
+        merged.urls = [ch.url for ch in top_channels]
+        merged.latency = primary.latency
+        merged.video_codec = primary.video_codec
+        merged.group_title = primary.group_title
+        merged.tvg_id = primary.tvg_id
+        merged.tvg_logo = getattr(primary, 'tvg_logo', '')
+        merged.ip_info = getattr(primary, 'ip_info', None)
         merged_channels.append(merged)
-
-    print(f"🔄 频道合并完成：{len(channels)} 个源 -> {len(merged_channels)} 个频道（含多源）")
+    
+    print(f"🔄 频道合并完成：{len(valid_channels)} 个源 -> {len(merged_channels)} 个频道（每个频道最多 {MAX_SOURCES_PER_CHANNEL} 个源）")
     return merged_channels
