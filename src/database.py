@@ -1,84 +1,228 @@
-import sqlite3
+# src/database.py
+# SQLite 数据库缓存模块，用于存储历史测速结果，减少重复请求
+
 import json
-from src.config import DATABASE_PATH
+import sqlite3
+import asyncio
+import aiosqlite
+from datetime import datetime, timedelta
+from typing import Optional, Dict, List, Any
+import hashlib
 
-class IPTVDatabase:
-    def __init__(self, db_path=DATABASE_PATH):
-        self.db_path = db_path
-        self._init_db()
+from src.config import DATABASE_ENABLE, DATABASE_PATH, DATABASE_TABLE
 
-    def _init_db(self):
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute('''
-                CREATE TABLE IF NOT EXISTS channels (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    url TEXT NOT NULL UNIQUE,
-                    latency INTEGER,
-                    province TEXT,
-                    city TEXT,
-                    isp TEXT,
-                    video_codec TEXT,
-                    group_title TEXT,
-                    tvg_id TEXT,
-                    tvg_logo TEXT,
-                    last_checked TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    is_valid BOOLEAN DEFAULT 1
+class DatabaseCache:
+    """异步 SQLite 数据库缓存管理器"""
+    
+    _instance = None
+    _conn = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    async def init(self):
+        """初始化数据库连接和表结构"""
+        if not DATABASE_ENABLE:
+            print("⚙️ 数据库缓存未启用，将跳过缓存功能")
+            return
+        
+        try:
+            self._conn = await aiosqlite.connect(DATABASE_PATH)
+            await self._create_tables()
+            print(f"✅ 数据库缓存已启用: {DATABASE_PATH}")
+        except Exception as e:
+            print(f"⚠️ 数据库初始化失败: {e}，将跳过缓存功能")
+            self._conn = None
+    
+    async def _create_tables(self):
+        """创建缓存表结构"""
+        # 频道源缓存表（存储拉取的原始源内容）
+        await self._conn.execute(f'''
+            CREATE TABLE IF NOT EXISTS {DATABASE_TABLE}_raw (
+                url TEXT PRIMARY KEY,
+                content TEXT,
+                etag TEXT,
+                last_modified TEXT,
+                updated_at TIMESTAMP
+            )
+        ''')
+        
+        # 频道测速结果缓存表
+        await self._conn.execute(f'''
+            CREATE TABLE IF NOT EXISTS {DATABASE_TABLE}_speed (
+                channel_key TEXT PRIMARY KEY,
+                name TEXT,
+                url TEXT,
+                latency INTEGER,
+                video_codec TEXT,
+                ip_info TEXT,
+                updated_at TIMESTAMP
+            )
+        ''')
+        
+        # 创建索引
+        await self._conn.execute(f'''
+            CREATE INDEX IF NOT EXISTS idx_raw_updated 
+            ON {DATABASE_TABLE}_raw (updated_at)
+        ''')
+        await self._conn.execute(f'''
+            CREATE INDEX IF NOT EXISTS idx_speed_updated 
+            ON {DATABASE_TABLE}_speed (updated_at)
+        ''')
+        
+        await self._conn.commit()
+    
+    async def get_raw_source(self, url: str, max_age_hours: int = 24) -> Optional[str]:
+        """获取缓存的原始源内容（如果未过期）"""
+        if not self._conn:
+            return None
+        
+        try:
+            cursor = await self._conn.execute(
+                f'SELECT content, updated_at FROM {DATABASE_TABLE}_raw WHERE url = ?',
+                (url,)
+            )
+            row = await cursor.fetchone()
+            await cursor.close()
+            
+            if row:
+                content, updated_at = row
+                updated_time = datetime.fromisoformat(updated_at)
+                if datetime.now() - updated_time < timedelta(hours=max_age_hours):
+                    return content
+        except Exception as e:
+            print(f"⚠️ 读取缓存失败 {url}: {e}")
+        return None
+    
+    async def set_raw_source(self, url: str, content: str, etag: str = "", last_modified: str = ""):
+        """保存原始源内容到缓存"""
+        if not self._conn:
+            return
+        
+        try:
+            await self._conn.execute(
+                f'''INSERT OR REPLACE INTO {DATABASE_TABLE}_raw 
+                    (url, content, etag, last_modified, updated_at) 
+                    VALUES (?, ?, ?, ?, ?)''',
+                (url, content, etag, last_modified, datetime.now().isoformat())
+            )
+            await self._conn.commit()
+        except Exception as e:
+            print(f"⚠️ 保存缓存失败 {url}: {e}")
+    
+    async def get_speed_result(self, channel_key: str, max_age_hours: int = 6) -> Optional[Dict]:
+        """获取缓存的测速结果"""
+        if not self._conn:
+            return None
+        
+        try:
+            cursor = await self._conn.execute(
+                f'SELECT name, url, latency, video_codec, ip_info, updated_at FROM {DATABASE_TABLE}_speed WHERE channel_key = ?',
+                (channel_key,)
+            )
+            row = await cursor.fetchone()
+            await cursor.close()
+            
+            if row:
+                name, url, latency, video_codec, ip_info_json, updated_at = row
+                updated_time = datetime.fromisoformat(updated_at)
+                if datetime.now() - updated_time < timedelta(hours=max_age_hours):
+                    return {
+                        "name": name,
+                        "url": url,
+                        "latency": latency,
+                        "video_codec": video_codec,
+                        "ip_info": json.loads(ip_info_json) if ip_info_json else None
+                    }
+        except Exception as e:
+            print(f"⚠️ 读取测速缓存失败: {e}")
+        return None
+    
+    async def set_speed_result(self, channel_key: str, channel_data: Dict):
+        """保存测速结果到缓存"""
+        if not self._conn:
+            return
+        
+        try:
+            await self._conn.execute(
+                f'''INSERT OR REPLACE INTO {DATABASE_TABLE}_speed 
+                    (channel_key, name, url, latency, video_codec, ip_info, updated_at) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                (
+                    channel_key,
+                    channel_data.get("name", ""),
+                    channel_data.get("url", ""),
+                    channel_data.get("latency", 9999),
+                    channel_data.get("video_codec", ""),
+                    json.dumps(channel_data.get("ip_info")) if channel_data.get("ip_info") else None,
+                    datetime.now().isoformat()
                 )
-            ''')
-            conn.execute('CREATE INDEX IF NOT EXISTS idx_name ON channels(name)')
-            conn.execute('CREATE INDEX IF NOT EXISTS idx_valid ON channels(is_valid)')
+            )
+            await self._conn.commit()
+        except Exception as e:
+            print(f"⚠️ 保存测速缓存失败: {e}")
+    
+    async def clear_expired(self, max_age_days: int = 7):
+        """清理过期缓存"""
+        if not self._conn:
+            return
+        
+        try:
+            expire_time = (datetime.now() - timedelta(days=max_age_days)).isoformat()
+            await self._conn.execute(
+                f'DELETE FROM {DATABASE_TABLE}_raw WHERE updated_at < ?',
+                (expire_time,)
+            )
+            await self._conn.execute(
+                f'DELETE FROM {DATABASE_TABLE}_speed WHERE updated_at < ?',
+                (expire_time,)
+            )
+            await self._conn.commit()
+        except Exception as e:
+            print(f"⚠️ 清理过期缓存失败: {e}")
+    
+    async def close(self):
+        """关闭数据库连接"""
+        if self._conn:
+            await self._conn.close()
+            self._conn = None
+    
+    async def get_stats(self) -> Dict:
+        """获取缓存统计信息"""
+        if not self._conn:
+            return {"enabled": False}
+        
+        try:
+            raw_cursor = await self._conn.execute(f'SELECT COUNT(*) FROM {DATABASE_TABLE}_raw')
+            raw_count = (await raw_cursor.fetchone())[0]
+            await raw_cursor.close()
+            
+            speed_cursor = await self._conn.execute(f'SELECT COUNT(*) FROM {DATABASE_TABLE}_speed')
+            speed_count = (await speed_cursor.fetchone())[0]
+            await speed_cursor.close()
+            
+            return {
+                "enabled": True,
+                "raw_sources": raw_count,
+                "speed_results": speed_count
+            }
+        except Exception:
+            return {"enabled": True, "raw_sources": 0, "speed_results": 0}
 
-    def save_channel(self, channel_info: dict):
-        """保存或更新频道信息（基于URL唯一）"""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute('''
-                INSERT OR REPLACE INTO channels 
-                (name, url, latency, province, city, isp, video_codec, group_title, tvg_id, tvg_logo, last_checked, is_valid)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
-            ''', (
-                channel_info.get('name'),
-                channel_info.get('url'),
-                channel_info.get('latency'),
-                channel_info.get('province'),
-                channel_info.get('city'),
-                channel_info.get('isp'),
-                channel_info.get('video_codec'),
-                channel_info.get('group_title'),
-                channel_info.get('tvg_id'),
-                channel_info.get('tvg_logo'),
-                1 if channel_info.get('is_valid', True) else 0
-            ))
+# 全局单例
+_db_cache = None
 
-    def get_all_valid_channels(self) -> list:
-        """获取所有有效频道（去重保留每个URL的最新记录）"""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute('''
-                SELECT name, url, latency, province, city, isp, video_codec, group_title, tvg_id, tvg_logo
-                FROM channels
-                WHERE is_valid = 1
-                ORDER BY name, latency
-            ''')
-            return [dict(row) for row in cursor.fetchall()]
+async def get_db_cache() -> DatabaseCache:
+    """获取数据库缓存单例"""
+    global _db_cache
+    if _db_cache is None:
+        _db_cache = DatabaseCache()
+        await _db_cache.init()
+    return _db_cache
 
-    def mark_invalid(self, url: str):
-        """将指定URL标记为无效"""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute('UPDATE channels SET is_valid = 0 WHERE url = ?', (url,))
-
-    def clear_invalid(self):
-        """清理无效记录（可选）"""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute('DELETE FROM channels WHERE is_valid = 0')
-
-    def is_url_exists(self, url: str) -> bool:
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute('SELECT 1 FROM channels WHERE url = ?', (url,))
-            return cursor.fetchone() is not None
-
-    def get_last_check_time(self):
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute('SELECT MAX(last_checked) FROM channels')
-            row = cursor.fetchone()
-            return row[0] if row and row[0] else None
+def channel_key(name: str, url: str) -> str:
+    """生成频道的唯一键"""
+    key_str = f"{name}|{url}"
+    return hashlib.md5(key_str.encode()).hexdigest()
