@@ -1,9 +1,10 @@
+# src/parser.py
 # M3U / TXT 解析与去重
+
 import re
-from urllib.parse import urlparse
-from src.config import HEADERS
 
 class Channel:
+    """原始频道对象（单源）"""
     def __init__(self, name: str, url: str, group_title: str = "", tvg_id: str = "", tvg_name: str = "", tvg_logo: str = ""):
         self.name = name.strip()
         self.url = url.strip()
@@ -11,14 +12,13 @@ class Channel:
         self.tvg_id = tvg_id
         self.tvg_name = tvg_name
         self.tvg_logo = tvg_logo
-        # 新增属性：测速延迟、IP信息、视频编码等
+        # 以下属性在后续处理中会被赋值
         self.latency = None
-        self.ip_info = None
         self.video_codec = None
-        self.has_video = False
-        self.has_audio = False
+        self.ip_info = None
 
     def key(self) -> str:
+        """去重键：频道名 + URL"""
         return f"{self.name}|{self.url}"
 
     def to_dict(self):
@@ -29,9 +29,7 @@ class Channel:
             "id": self.tvg_id,
             "logo": self.tvg_logo,
             "latency": self.latency,
-            "video_codec": self.video_codec,
-            "has_video": self.has_video,
-            "has_audio": self.has_audio
+            "video_codec": self.video_codec
         }
 
 def parse_m3u(content: str) -> list:
@@ -47,7 +45,6 @@ def parse_m3u(content: str) -> list:
             tvg_id = ""
             tvg_name = ""
             tvg_logo = ""
-            # 匹配 group-title="..."
             match = re.search(r'group-title="([^"]+)"', line)
             if match:
                 group_title = match.group(1)
@@ -96,7 +93,6 @@ def parse_and_dedupe(raw_contents: dict) -> dict:
     for url, content in raw_contents.items():
         if not content:
             continue
-        # 根据内容格式选择解析器
         if content.strip().startswith("#EXTM3U"):
             channels = parse_m3u(content)
         else:
