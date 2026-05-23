@@ -1,5 +1,5 @@
 # src/classifier.py
-# 智能分类模块（支持字典和对象输入）
+# 智能分类模块（支持字典和对象输入，增强地方频道识别）
 
 from src.config import CATEGORY_KEYWORDS, CCTV_ORDER
 
