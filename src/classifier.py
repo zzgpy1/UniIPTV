@@ -2,7 +2,7 @@
 from src.config import CATEGORY_KEYWORDS
 
 # 需要剔除的关键词（频道名中包含这些词则丢弃）
-EXCLUDED_KEYWORDS = ["旅游", "春晚"，"游戏"]
+EXCLUDED_KEYWORDS = ["旅游", "春晚","游戏"]
 
 def is_excluded_channel(channel_name: str) -> bool:
     """检查频道名是否包含排除关键词"""
