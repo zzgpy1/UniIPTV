@@ -1,9 +1,15 @@
-# 输出生成：M3U 和 TXT 格式（支持多源）
+# src/generator.py
+# 输出生成：支持多源的 M3U 和 TXT 格式
+
 import os
 from src.config import OUTPUT_DIR, M3U_FILE, TXT_FILE
 
 def generate_m3u(classified: dict, output_path: str):
-    """生成支持多源（备胎）的 M3U 文件"""
+    """
+    生成标准 M3U 文件，支持多源（每个频道多个备选URL）
+    分类参数 classified 格式: {分类名: [频道对象字典列表]}
+    每个频道字典应包含 'name', 'urls' (列表), 'group_title', 'id', 'logo' 等
+    """
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n")
         for category, channels in classified.items():
@@ -11,47 +17,41 @@ def generate_m3u(classified: dict, output_path: str):
                 continue
             f.write(f"\n# 分类: {category}\n")
             for ch in channels:
-                # 判断是否为合并后的频道（有 urls 属性）
-                if hasattr(ch, 'urls') and ch.urls:
-                    urls = ch.urls
-                else:
-                    urls = [ch.url] if hasattr(ch, 'url') else []
-                
-                for idx, url in enumerate(urls):
-                    if idx == 0:
-                        # 第一个源使用完整的 #EXTINF 标签
-                        extinf = f'#EXTINF:-1'
-                        if hasattr(ch, 'tvg_id') and ch.tvg_id:
-                            extinf += f' tvg-id="{ch.tvg_id}"'
-                        if hasattr(ch, 'tvg_logo') and ch.tvg_logo:
-                            extinf += f' tvg-logo="{ch.tvg_logo}"'
-                        if category:
-                            extinf += f' group-title="{category}"'
-                        extinf += f',{ch.name}\n'
-                        f.write(extinf)
-                    else:
-                        # 备用源添加注释（播放器可识别为同一频道的备选）
-                        f.write(f'#EXTINF:-1 group-title="{category}",备选{idx}:{ch.name}\n')
+                # 兼容合并后的频道（有 urls 列表）和普通频道（有 url 字符串）
+                urls = ch.get('urls') if ch.get('urls') else [ch.get('url', '')]
+                if not urls:
+                    continue
+                # 第一个源使用完整标签
+                extinf = f'#EXTINF:-1'
+                if ch.get('id'):
+                    extinf += f' tvg-id="{ch["id"]}"'
+                if ch.get('logo'):
+                    extinf += f' tvg-logo="{ch["logo"]}"'
+                if category:
+                    extinf += f' group-title="{category}"'
+                extinf += f',{ch["name"]}\n'
+                f.write(extinf)
+                f.write(f"{urls[0]}\n")
+                # 如果有备用源，为每个备用源添加一行（只写URL，播放器会自动尝试）
+                for idx, url in enumerate(urls[1:], start=1):
+                    # 可选：添加注释行说明备用源
+                    f.write(f'#EXTINF:-1 group-title="{category}",备用源{idx}:{ch["name"]}\n')
                     f.write(f"{url}\n")
-                # 换行分隔不同频道
-                f.write("\n")
 
 def generate_txt(classified: dict, output_path: str):
-    """生成 TXT 格式（分类注释 + URL 列表，只输出第一个URL）"""
+    """
+    生成 TXT 格式（分类注释 + URL 列表）
+    为简化，只输出每个频道的第一个 URL（最佳源）
+    """
     with open(output_path, "w", encoding="utf-8") as f:
         for category, channels in classified.items():
             if not channels:
                 continue
             f.write(f"\n# {category}\n")
             for ch in channels:
-                # TXT 只输出第一个可用的 URL
-                if hasattr(ch, 'urls') and ch.urls:
-                    url = ch.urls[0]
-                elif hasattr(ch, 'url'):
-                    url = ch.url
-                else:
-                    continue
-                f.write(f"{url}\n")
+                url = ch.get('urls', [ch.get('url', '')])[0]
+                if url:
+                    f.write(f"{url}\n")
 
 def generate_outputs(classified: dict):
     """生成所有输出文件，并确保输出目录存在"""
