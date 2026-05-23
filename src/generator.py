@@ -1,9 +1,9 @@
 # src/generator.py
 import os
+import re
 from src.config import OUTPUT_DIR, M3U_FILE, TXT_FILE
 
 # 定义输出分类顺序：央视 → 卫视 → 各省份（按拼音顺序） → 动漫
-# 省份列表（按拼音排序，可根据需要调整）
 PROVINCES = [
     "北京", "天津", "上海", "重庆",
     "河北", "山西", "辽宁", "吉林", "黑龙江",
@@ -17,41 +17,62 @@ PROVINCES = [
 # 需要过滤掉的一级分类（不输出）
 FILTER_CATEGORIES = ["旅游", "国际", "游戏", "其他"]
 
+def extract_cctv_number(name: str) -> float:
+    """
+    从频道名称中提取央视的数字编号，用于排序。
+    支持格式：CCTV-1, CCTV1, CCTV-5+, CCTV5+, 中央1, 央视1等
+    返回浮点数，特殊频道如CCTV-5+返回5.5，否则返回999
+    """
+    # 匹配 CCTV 后跟数字和可能的 + 号
+    match = re.search(r'CCTV[- ]?(\d+)(\+?)', name, re.IGNORECASE)
+    if match:
+        num = int(match.group(1))
+        if match.group(2) == '+':
+            return num + 0.5
+        return float(num)
+    # 匹配中文 央视/中央 数字
+    match = re.search(r'[央视央视频道](\d+)', name)
+    if match:
+        return float(match.group(1))
+    return 999.0  # 非央视频道放最后
+
+def sort_channels_in_category(category: str, channels: list) -> list:
+    """根据分类对频道列表进行排序"""
+    if category == "央视":
+        # 按央视数字排序
+        channels.sort(key=lambda x: extract_cctv_number(x.get("name", "")))
+    else:
+        # 其他分类按频道名拼音排序
+        channels.sort(key=lambda x: x.get("name", ""))
+    return channels
+
 def get_category_order(category: str) -> int:
-    """返回分类的排序权重"""
     if category == "央视":
         return 0
     if category == "卫视":
         return 1
     if category in PROVINCES:
-        # 省份权重从 2 开始
         return 2 + PROVINCES.index(category)
     if category == "动漫":
         return 1000
-    # 其他未列入的分类（但未被过滤）放在最后
     return 2000
 
 def filter_and_sort_categories(classified: dict) -> dict:
-    """过滤不需要的分类，并按自定义顺序排序"""
-    # 过滤
     filtered = {k: v for k, v in classified.items() if k not in FILTER_CATEGORIES}
-    # 排序
     sorted_items = sorted(filtered.items(), key=lambda item: get_category_order(item[0]))
     return dict(sorted_items)
 
 def generate_m3u(classified: dict, output_path: str):
-    """生成 M3U 文件，按分类顺序输出"""
-    # 先过滤和排序
     classified = filter_and_sort_categories(classified)
-
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n")
         for category, channels in classified.items():
             if not channels:
                 continue
+            # 在写入前对当前分类的频道进行排序
+            channels = sort_channels_in_category(category, channels)
             f.write(f"\n# 分类: {category}\n")
             for ch in channels:
-                # ch 是字典，包含 name, urls, url, 等
                 urls = ch.get("urls", [ch.get("url")])
                 for idx, url in enumerate(urls):
                     if idx == 0:
@@ -67,15 +88,14 @@ def generate_m3u(classified: dict, output_path: str):
                     f.write(f"{url}\n")
 
 def generate_txt(classified: dict, output_path: str):
-    """生成 TXT 文件，也按分类顺序输出"""
     classified = filter_and_sort_categories(classified)
     with open(output_path, "w", encoding="utf-8") as f:
         for category, channels in classified.items():
             if not channels:
                 continue
+            channels = sort_channels_in_category(category, channels)
             f.write(f"\n# {category}\n")
             for ch in channels:
-                # TXT 只输出第一个 URL
                 url = ch.get("urls", [ch.get("url")])[0]
                 f.write(f"{url}\n")
 
