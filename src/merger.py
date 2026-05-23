@@ -4,6 +4,7 @@
 from collections import defaultdict
 from typing import List
 
+
 class MergedChannel:
     """合并后的频道对象，包含多个备选URL"""
     def __init__(self, name: str, urls: List[str], latency: int, video_codec: str,
@@ -16,17 +17,6 @@ class MergedChannel:
         self.tvg_id = tvg_id
         self.tvg_logo = tvg_logo
 
-    def to_dict(self):
-        """转换为字典格式，供分类器使用"""
-        return {
-            "name": self.name,
-            "urls": self.urls,
-            "latency": self.latency,
-            "video_codec": self.video_codec,
-            "group_title": self.group_title,
-            "id": self.tvg_id,
-            "logo": self.tvg_logo
-        }
 
 def normalize_channel_name(name: str) -> str:
     """标准化频道名，用于合并不同来源的同一频道"""
@@ -36,6 +26,7 @@ def normalize_channel_name(name: str) -> str:
     # 移除空格及特殊符号
     name = re.sub(r'[^\w\u4e00-\u9fa5]', '', name)
     return name.strip()
+
 
 def merge_channels_by_name(valid_channels: list) -> list:
     """
@@ -52,7 +43,9 @@ def merge_channels_by_name(valid_channels: list) -> list:
     for norm_name, channels in groups.items():
         # 排序：编码优先，然后延迟
         channels.sort(key=lambda x: (
-            0 if getattr(x, 'video_codec', '') == 'h264' else 1 if getattr(x, 'video_codec', '') == 'hevc' else 2,
+            0 if getattr(x, 'video_codec', '') == 'h264' 
+            else 1 if getattr(x, 'video_codec', '') == 'hevc' 
+            else 2,
             getattr(x, 'latency', 9999)
         ))
         top_channels = channels[:5]
