@@ -6,10 +6,27 @@ import aiohttp
 import time
 from src.config import HEADERS, TIMEOUT, MAX_WORKERS, ENABLE_IP_RESOLVE
 from src.ip_resolver import get_resolver
+from src.database import get_db_cache, channel_key
+from src.config import DATABASE_ENABLE
 
 async def probe_channel(session, channel):
-    """异步探测单个频道，返回 (channel, latency_ms, success, ip_info)"""
+    """异步探测单个频道，支持测速结果缓存"""
     url = channel.url
+    
+    # 1. 检查测速缓存
+    if DATABASE_ENABLE:
+        db = await get_db_cache()
+        ch_key = channel_key(channel.name, url)
+        cached = await db.get_speed_result(ch_key)
+        if cached:
+            print(f"📦 使用测速缓存: {channel.name}")
+            channel.latency = cached["latency"]
+            channel.video_codec = cached["video_codec"]
+            if cached["ip_info"]:
+                channel.ip_info = cached["ip_info"]
+            return channel, cached["latency"], True, cached["ip_info"]
+    
+    # 2. 缓存未命中，执行实际测速
     try:
         start = time.time()
         async with session.head(url, timeout=TIMEOUT, allow_redirects=True, headers=HEADERS) as resp:
@@ -21,6 +38,18 @@ async def probe_channel(session, channel):
                     resolver = get_resolver()
                     if resolver.is_available:
                         ip_info = resolver.resolve_channel_ip(channel)
+                
+                # 3. 保存到缓存
+                if DATABASE_ENABLE:
+                    db = await get_db_cache()
+                    await db.set_speed_result(ch_key, {
+                        "name": channel.name,
+                        "url": url,
+                        "latency": latency,
+                        "video_codec": getattr(channel, 'video_codec', ''),
+                        "ip_info": ip_info
+                    })
+                
                 return channel, latency, True, ip_info
             else:
                 return channel, latency, False, None
