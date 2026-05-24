@@ -8,7 +8,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from src.config import (
     IPTV_SOURCES, OUTPUT_DIR, ENABLE_REGION_FILTER,
     PREFERRED_LOCATION, PREFERRED_ISP, ENABLE_IP_RESOLVE,
-    ENABLE_DEMO_FILTER, ENABLE_ALIAS, ENABLE_BLACKLIST
+    ENABLE_DEMO_FILTER, ENABLE_ALIAS, ENABLE_BLACKLIST,
+    CCTV_ORDER  # 导入央视顺序
 )
 from src.fetcher import fetch_all_sources
 from src.parser import parse_and_dedupe
@@ -22,6 +23,7 @@ from src.cache_manager import CacheManager
 from src.blacklist_filter import get_blacklist_filter
 from src.demo_filter import filter_and_order_by_demo
 
+# 允许保留的分类（只输出这些）
 ALLOWED_CATEGORIES = {"央视", "卫视", "地方", "港澳台"}
 
 def init_ip_resolver():
@@ -55,20 +57,19 @@ def filter_by_region(channels):
     return filtered
 
 def build_classified_from_ordered(ordered_channels):
-    """按 demo 顺序构建分类字典，只保留允许的分类，并保持分类内频道顺序"""
-    classified = {}
-    category_order = []
-
+    """
+    根据有序频道列表构建分类字典，强制输出顺序：央视、卫视、地方、港澳台。
+    央视内部按 CCTV_ORDER 排序，其他分类保持传入顺序（即 demo 中的顺序）。
+    """
+    # 先按原顺序收集每个分类下的频道（保留顺序）
+    temp = {cat: [] for cat in ALLOWED_CATEGORIES}
     for ch in ordered_channels:
         cat = classify_channel(ch)
-        # 将 demo 中的“🌊港·澳·台”映射为“港澳台”
+        # 映射港澳台
         if cat in ["🌊港·澳·台", "港澳台"]:
             cat = "港澳台"
         if cat not in ALLOWED_CATEGORIES:
             continue
-        if cat not in classified:
-            classified[cat] = []
-            category_order.append(cat)
         # 转换为字典格式
         if hasattr(ch, 'to_dict'):
             ch_dict = ch.to_dict()
@@ -86,10 +87,26 @@ def build_classified_from_ordered(ordered_channels):
                 "video_codec": getattr(ch, 'video_codec', ''),
                 "ip_info": getattr(ch, 'ip_info', None)
             }
-        classified[cat].append(ch_dict)
+        temp[cat].append(ch_dict)
 
-    result = {cat: classified[cat] for cat in category_order}
-    print("📊 分类统计（按 demo 顺序，仅保留央视、卫视、地方、港澳台）：")
+    # 对央视频道进行排序
+    def ctv_sort_key(ch):
+        name = ch["name"]
+        for idx, std in enumerate(CCTV_ORDER):
+            if std.lower() in name.lower() or name.lower() in std.lower():
+                return idx
+        return len(CCTV_ORDER)  # 未匹配的放最后
+    temp["央视"] = sorted(temp["央视"], key=ctv_sort_key)
+
+    # 按强制顺序输出
+    result = {}
+    for cat in ["央视", "卫视", "地方", "港澳台"]:
+        if temp.get(cat):
+            result[cat] = temp[cat]
+        else:
+            result[cat] = []
+
+    print("📊 分类统计（强制顺序：央视、卫视、地方、港澳台）：")
     for cat, lst in result.items():
         if lst:
             print(f"  {cat}: {len(lst)} 个频道")
