@@ -1,114 +1,140 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Demo 频道列表筛选模块（修正版）
-- 正确解析 demo.txt，忽略分类行（以 ,#genre# 结尾的行）
-- 使用宽松的标准化匹配（去除清晰度、括号、空格等）
-- 支持别名映射（可选）
+Demo 频道筛选与排序模块
+- 解析 demo.txt，提取分类和频道顺序
+- 筛选采集到的频道，只保留 demo 中出现的频道
+- 按 demo 顺序输出频道列表
 """
 
 import re
 import os
-from typing import Set, List, Any
-from src.alias_matcher import get_alias_matcher
-from src.config import DEMO_FILE, ENABLE_DEMO_FILTER, ENABLE_ALIAS
+from typing import List, Tuple, Dict, Any, Optional
 
-def load_demo_channels(demo_file: str = DEMO_FILE) -> Set[str]:
+def parse_demo_order(demo_file: str = "demo.txt") -> List[Tuple[str, str]]:
     """
-    从 demo.txt 加载期望的频道名称集合
-    忽略分类行（以 ,#genre# 结尾的行），只保留纯频道名
+    解析 demo.txt，返回有序列表 [(分类名, 频道名), ...]
+    分类名来自行如 "📺央视频道,#genre#"，频道名是后续行直到下一个分类
     """
     if not os.path.exists(demo_file):
-        print(f"⚠️ Demo 文件不存在: {demo_file}，将跳过筛选")
-        return set()
-    
-    demos = set()
+        print(f"⚠️ Demo 文件不存在: {demo_file}")
+        return []
+
+    order = []
+    current_category = None
     with open(demo_file, 'r', encoding='utf-8') as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
-            # 跳过分类行（如 "📺央视频道,#genre#"）
+            # 分类行格式：任意文字,#genre#
             if line.endswith(",#genre#"):
+                # 提取分类名（去掉末尾的 ,#genre#）
+                current_category = line[:-7]
                 continue
-            # 跳过注释行
+            # 跳过注释行（以 # 开头但不是分类行）
             if line.startswith('#'):
                 continue
-            # 标准化频道名（用于后续匹配）
-            normalized = normalize_name(line)
-            if normalized:
-                demos.add(normalized)
-    print(f"📋 已加载 {len(demos)} 个 Demo 频道（来自 {demo_file}）")
-    return demos
+            # 普通频道名行
+            if current_category is not None:
+                order.append((current_category, line))
+            else:
+                # 没有分类行时，归类为“其他”
+                order.append(("其他", line))
+    print(f"📋 从 demo.txt 解析到 {len(order)} 个有序频道，共 {len(set(cat for cat, _ in order))} 个分类")
+    return order
 
 def normalize_name(name: str) -> str:
-    """
-    标准化频道名，用于匹配 demo 列表
-    规则：
-    - 转小写
-    - 去除分辨率标签（1080p、720p、4K、HD等）
-    - 去除括号及其内容
-    - 去除多余空格和特殊符号（保留字母、数字、中文、连字符、点）
-    """
+    """标准化频道名用于匹配（与之前版本一致）"""
     if not name:
         return ""
     name = name.lower()
-    # 去除常见清晰度标签
+    # 去除清晰度标签
     name = re.sub(r'\b(?:1080[pi]|720[pi]|4k|8k|hd|uhd|高清|超清|标清|流畅|付费|备\d*)\b', '', name, flags=re.IGNORECASE)
-    # 去除括号及其内容（包括中英文括号）
+    # 去除括号内容
     name = re.sub(r'[（(][^）)]*[）)]', '', name)
-    # 去除末尾无意义的符号
-    name = re.sub(r'[ _\-]+$', '', name)
-    # 保留字母、数字、中文、连字符、点、空格（但后续会压缩空格）
+    # 保留字母数字中文连字符点空格
     name = re.sub(r'[^\w\u4e00-\u9fa5\-. ]', '', name)
-    # 压缩多个空格为单个空格
     name = re.sub(r'\s+', ' ', name).strip()
     return name
 
-def filter_by_demo(channels: List[Any], demo_file: str = DEMO_FILE) -> List[Any]:
+def match_channel_name(channel_name: str, demo_name: str) -> bool:
     """
-    根据 demo.txt 筛选频道
-    优先级：别名匹配（若启用） > 标准化名称匹配
+    判断采集到的频道名是否匹配 demo 中的频道名
+    支持：
+    - 标准化后完全匹配
+    - demo 名包含在采集名中（如 demo="CCTV-1", 采集="CCTV-1 高清"）
+    - 采集名包含在 demo 名中（如 demo="CCTV-1综合", 采集="CCTV-1"）
     """
-    if not ENABLE_DEMO_FILTER:
-        print("⚙️ Demo 筛选未启用")
+    std_c = normalize_name(channel_name)
+    std_d = normalize_name(demo_name)
+    if std_c == std_d:
+        return True
+    if std_d in std_c or std_c in std_d:
+        return True
+    # 额外处理常见变体：去除连字符
+    if std_d.replace('-', '') == std_c.replace('-', ''):
+        return True
+    return False
+
+def filter_and_order_by_demo(
+    channels: List[Any],
+    demo_file: str = "demo.txt",
+    alias_matcher=None
+) -> List[Any]:
+    """
+    根据 demo.txt 筛选并排序频道
+    channels: 采集到的频道列表（每个元素可以是对象或字典，需有 name 属性）
+    返回：按 demo 顺序排列的频道列表（每个频道保留原有属性）
+    """
+    demo_order = parse_demo_order(demo_file)
+    if not demo_order:
+        print("⚠️ demo.txt 为空或不存在，保留原顺序")
         return channels
-    
-    demo_set = load_demo_channels(demo_file)
-    if not demo_set:
-        print("⚠️ Demo 列表为空，保留所有频道")
-        return channels
-    
-    alias_matcher = get_alias_matcher() if ENABLE_ALIAS else None
-    
-    filtered = []
-    for ch in channels:
-        # 获取频道名称（兼容对象和字典）
-        if hasattr(ch, 'name'):
-            name = ch.name
-        elif isinstance(ch, dict) and 'name' in ch:
-            name = ch['name']
-        else:
+
+    # 构建 name -> 频道的映射（优先使用第一个匹配，保留多源信息）
+    # 注意：同一个频道名可能对应多个采集到的频道（不同源），我们只保留最好的那个（已在合并时处理好）
+    # 这里简化：每个 demo 条目最多匹配一个采集频道
+    matched_channels = []  # 按 demo 顺序存放匹配到的频道对象
+    used = set()  # 记录已使用的采集频道索引
+
+    # 为提高效率，先将采集频道按 name 建立索引（标准化名 -> 频道列表）
+    index = {}
+    for idx, ch in enumerate(channels):
+        name = ch.name if hasattr(ch, 'name') else ch.get('name', '')
+        if not name:
             continue
-        
+        norm = normalize_name(name)
+        if norm not in index:
+            index[norm] = []
+        index[norm].append((idx, ch))
+
+    # 按 demo 顺序逐一匹配
+    for category, demo_name in demo_order:
         matched = False
-        
-        # 1. 尝试别名匹配
-        if alias_matcher:
-            standard_name = alias_matcher.match(name)
-            if standard_name:
-                std_norm = normalize_name(standard_name)
-                if std_norm in demo_set:
+        norm_demo = normalize_name(demo_name)
+        # 首先尝试直接匹配标准化名
+        if norm_demo in index:
+            # 取第一个未使用的
+            for idx, ch in index[norm_demo]:
+                if idx not in used:
+                    matched_channels.append(ch)
+                    used.add(idx)
                     matched = True
-        
-        # 2. 降级使用标准化名称匹配
+                    break
         if not matched:
-            norm_name = normalize_name(name)
-            if norm_name in demo_set:
-                matched = True
-        
-        if matched:
-            filtered.append(ch)
-    
-    print(f"🎯 Demo 筛选：原始 {len(channels)} 个频道 -> 保留 {len(filtered)} 个频道")
-    return filtered
+            # 尝试模糊匹配（遍历所有未使用的）
+            for norm_key, ch_list in index.items():
+                if match_channel_name(norm_key, norm_demo):
+                    for idx, ch in ch_list:
+                        if idx not in used:
+                            matched_channels.append(ch)
+                            used.add(idx)
+                            matched = True
+                            break
+                if matched:
+                    break
+        # 如果没有匹配到，跳过该频道（不保留）
+
+    print(f"🎯 Demo 筛选：原始 {len(channels)} 个频道 -> 匹配 {len(matched_channels)} 个频道（按 demo 顺序）")
+    return matched_channels
