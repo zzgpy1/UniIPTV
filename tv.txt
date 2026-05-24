@@ -40,13 +40,6 @@ http://t.061899.xyz/tl/tl.php?id=hxjc
 http://t.061899.xyz/tl/tl.php?id=fztd
 http://t.061899.xyz/tl/tl.php?id=ymkt
 
-# 音乐
-http://74.91.26.218:82/live/cctv3hd.m3u8
-
-# 体育
-http://74.91.26.218:82/live/cctv5hd.m3u8
-http://74.91.26.218:82/live/cctv16hd.m3u8
-
 # 地方
 http://8.138.7.223/tv/1905.php?id=LIVE3YPYZ30E7V1R0
 https://gcalic.v.myalicdn.com/gc/ztd_1/index.m3u8
@@ -177,7 +170,6 @@ https://play.scrstv.com.cn/DT/live.m3u8?auth_key=60001724663204-0-0-c1cc4ded9841
 https://m3u8.channel.dzsm.com/nmip-media/channellive/channel105549/playlist.m3u8
 http://pili-live-hls.ybcxjd.com/jdh-live/2108111201035597.m3u8?zsicd
 https://m3u8channel-bx.yunxya.com/nmip-media/channellive/channel104666/playlist.m3u8
-http://30814.hlsplay.aodianyun.com/lms_30814/tv_channel_246.flv
 https://gcalic.v.myalicdn.com/gc/sgns02_1/index.m3u8
 https://gcalic.v.myalicdn.com/gc/emsarm_1/index.m3u8
 https://m3u8.channel.dzsm.com/nmip-media/channellive/channel101257/playlist.m3u8
@@ -321,23 +313,6 @@ http://61.221.215.25:8800/hls/48/index.m3u8
 http://php.jdshipin.com:8880/TVOD/iptv.php?id=j1
 https://cdn6.163189.xyz/163189/asam
 
-# 动漫
-http://74.91.26.218:82/live/cctv14hd.m3u8
-
-# 其他
-https://amg00405-rakutentv-cgtn-rakuten-i9tar.amagi.tv/master.m3u8
-https://video.bread-tv.com:8091/hls-live24/online/index.m3u8
-http://r.jdshipin.com/ZQ4kN
-http://r.jdshipin.com/qrfbg
-http://183.64.181.25:40023/rongchang01.m3u8
-https://ali-m-l.cztv.com/channels/lantian/channel012/1080p.m3u8
-https://l.cztvcloud.com/channels/lantian/SXyuyao3/720p.m3u8
-http://live1.gatv.com.cn:85/live/GGPD_ggpdzm.m3u8
-https://stream2.jlntv.cn/jlcc/sd/live.m3u8
-https://stream2.jlntv.cn/qg/sd/live.m3u8
-https://stream2.jlntv.cn/ja/sd/live.m3u8
-http://r.jdshipin.com/vSJvl
-
 # 卫视
 http://bp-resource-dfl.bestv.cn/148/3/video.m3u8
 http://123.130.84.106:8154/tsfile/live/0116_1.m3u8
@@ -434,12 +409,8 @@ http://ls.qingting.fm/live/4877.m3u8
 http://phonehwei.qing.mgtv.com/nn_live/nn_x64/dWlwPTEwNi4xNC4zOC41NSZ0ZXJtPTUmcWlkPSZyYXV0aF9lbmFibGU9b2ZmJmNkbmV4X2lkPWh3X3Bob25lJmNocz0mZGVmPTEmcz04NDhmYWYyOTNiMWU3OTU0OTVlZWFjMTQ2NDIzNmY3MyZ1aWQ9JnV1aWQ9OGYzOTY4MjhhN2NlZGNmYzNkYmZlNjI4MmZiYTM4MDAtNmEwZTI2Mzcmdj0yJmFzPTAmZXM9MTc3OTU4NzcxMg,,/HNGGMPP360.m3u8
 http://live.shaoxing.com.cn/video/s10001-sxtv2/index.m3u8
 
-# 新闻
-http://r.jdshipin.com/CkuBd
-https://stream2.jlntv.cn/tonghua1/sd/live.m3u8
-https://live.wjyanghu.com/live/CH1.m3u8
-
-# 影视
-http://iptv.4666888.xyz/iptv2A.php?id=45
-http://jsmov2.a.yximgs.com/bs3/video-hls/5203346449046555193_hlsb.m3u8
-http://iptv.4666888.xyz/iptv2A.php?id=30
+# 港澳台
+https://video.bread-tv.com:8091/hls-live24/online/index.m3u8
+http://r.jdshipin.com/ZQ4kN
+http://r.jdshipin.com/qrfbg
+http://30814.hlsplay.aodianyun.com/lms_30814/tv_channel_246.flv

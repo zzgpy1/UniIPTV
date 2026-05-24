@@ -80,16 +80,6 @@ http://t.061899.xyz/tl/tl.php?id=fztd
 #EXTINF:-1 tvg-id="606" group-title="央视",优漫卡通
 http://t.061899.xyz/tl/tl.php?id=ymkt
 
-# 分类: 音乐
-#EXTINF:-1 tvg-id="116" group-title="音乐",CCTV-3
-http://74.91.26.218:82/live/cctv3hd.m3u8
-
-# 分类: 体育
-#EXTINF:-1 tvg-id="92" group-title="体育",CCTV-5
-http://74.91.26.218:82/live/cctv5hd.m3u8
-#EXTINF:-1 tvg-id="130" group-title="体育",CCTV-16
-http://74.91.26.218:82/live/cctv16hd.m3u8
-
 # 分类: 地方
 #EXTINF:-1 tvg-id="455" group-title="地方",CCTV-6电影
 http://8.138.7.223/tv/1905.php?id=LIVE3YPYZ30E7V1R0
@@ -349,8 +339,6 @@ https://m3u8.channel.dzsm.com/nmip-media/channellive/channel105549/playlist.m3u8
 http://pili-live-hls.ybcxjd.com/jdh-live/2108111201035597.m3u8?zsicd
 #EXTINF:-1 tvg-id="702" group-title="地方",名山综合
 https://m3u8channel-bx.yunxya.com/nmip-media/channellive/channel104666/playlist.m3u8
-#EXTINF:-1 tvg-id="678" group-title="地方",四川 Ⅰ 巴中综合台 [Not 24/7]
-http://30814.hlsplay.aodianyun.com/lms_30814/tv_channel_246.flv
 #EXTINF:-1 tvg-id="249" group-title="地方",四川四姑娘山隆珠措
 https://gcalic.v.myalicdn.com/gc/sgns02_1/index.m3u8
 #EXTINF:-1 tvg-id="260" group-title="地方",四川峨眉山云海日出
@@ -636,36 +624,6 @@ http://php.jdshipin.com:8880/TVOD/iptv.php?id=j1
 #EXTINF:-1 tvg-id="69" group-title="地方",澳视澳门
 https://cdn6.163189.xyz/163189/asam
 
-# 分类: 动漫
-#EXTINF:-1 tvg-id="99" group-title="动漫",CCTV-14
-http://74.91.26.218:82/live/cctv14hd.m3u8
-
-# 分类: 其他
-#EXTINF:-1 tvg-id="109" group-title="其他",CGTN
-https://amg00405-rakutentv-cgtn-rakuten-i9tar.amagi.tv/master.m3u8
-#EXTINF:-1 tvg-id="510" group-title="其他",Bread TV面包台
-https://video.bread-tv.com:8091/hls-live24/online/index.m3u8
-#EXTINF:-1 tvg-id="113" group-title="其他",明珠台
-http://r.jdshipin.com/ZQ4kN
-#EXTINF:-1 tvg-id="70" group-title="其他",翡翠台
-http://r.jdshipin.com/qrfbg
-#EXTINF:-1 tvg-id="432" group-title="其他",荣昌综合 [Not 24/7]
-http://183.64.181.25:40023/rongchang01.m3u8
-#EXTINF:-1 tvg-id="707" group-title="其他",之江纪录
-https://ali-m-l.cztv.com/channels/lantian/channel012/1080p.m3u8
-#EXTINF:-1 tvg-id="233" group-title="其他",余姚姚江文化
-https://l.cztvcloud.com/channels/lantian/SXyuyao3/720p.m3u8
-#EXTINF:-1 tvg-id="434" group-title="其他",广安公共
-http://live1.gatv.com.cn:85/live/GGPD_ggpdzm.m3u8
-#EXTINF:-1 tvg-id="266" group-title="其他",长春综合 [Geo-blocked]
-https://stream2.jlntv.cn/jlcc/sd/live.m3u8
-#EXTINF:-1 tvg-id="235" group-title="其他",前郭综合 [Geo-blocked]
-https://stream2.jlntv.cn/qg/sd/live.m3u8
-#EXTINF:-1 tvg-id="243" group-title="其他",集安综合 [Geo-blocked]
-https://stream2.jlntv.cn/ja/sd/live.m3u8
-#EXTINF:-1 tvg-id="349" group-title="其他",ViuTV
-http://r.jdshipin.com/vSJvl
-
 # 分类: 卫视
 #EXTINF:-1 tvg-id="242" group-title="卫视",东方卫视
 http://bp-resource-dfl.bestv.cn/148/3/video.m3u8
@@ -856,18 +814,12 @@ http://phonehwei.qing.mgtv.com/nn_live/nn_x64/dWlwPTEwNi4xNC4zOC41NSZ0ZXJtPTUmcW
 #EXTINF:-1 tvg-id="202" group-title="卫视",绍兴公共
 http://live.shaoxing.com.cn/video/s10001-sxtv2/index.m3u8
 
-# 分类: 新闻
-#EXTINF:-1 tvg-id="216" group-title="新闻",无线新闻
-http://r.jdshipin.com/CkuBd
-#EXTINF:-1 tvg-id="258" group-title="新闻",通化新闻 [Geo-blocked]
-https://stream2.jlntv.cn/tonghua1/sd/live.m3u8
-#EXTINF:-1 tvg-id="664" group-title="新闻",武进新闻 [Not 24/7]
-https://live.wjyanghu.com/live/CH1.m3u8
-
-# 分类: 影视
-#EXTINF:-1 tvg-id="407" group-title="影视",龙华电影
-http://iptv.4666888.xyz/iptv2A.php?id=45
-#EXTINF:-1 tvg-id="171" group-title="影视",龙门飞甲
-http://jsmov2.a.yximgs.com/bs3/video-hls/5203346449046555193_hlsb.m3u8
-#EXTINF:-1 tvg-id="630" group-title="影视",美亚电影
-http://iptv.4666888.xyz/iptv2A.php?id=30
+# 分类: 港澳台
+#EXTINF:-1 tvg-id="510" group-title="港澳台",Bread TV面包台
+https://video.bread-tv.com:8091/hls-live24/online/index.m3u8
+#EXTINF:-1 tvg-id="113" group-title="港澳台",明珠台
+http://r.jdshipin.com/ZQ4kN
+#EXTINF:-1 tvg-id="70" group-title="港澳台",翡翠台
+http://r.jdshipin.com/qrfbg
+#EXTINF:-1 tvg-id="678" group-title="港澳台",四川 Ⅰ 巴中综合台 [Not 24/7]
+http://30814.hlsplay.aodianyun.com/lms_30814/tv_channel_246.flv
