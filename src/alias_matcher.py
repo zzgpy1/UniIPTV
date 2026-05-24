@@ -1,75 +1,60 @@
-# src/alias_matcher.py
-# 别名匹配模块：使用正则表达式将采集到的频道名映射到标准名称
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+别名匹配模块
+从 alias.txt 加载正则表达式映射，将频道名标准化为统一名称
+"""
 
 import re
 import os
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 
 class AliasMatcher:
-    """别名匹配器，加载 alias.txt 中的规则并应用"""
-
-    _instance = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._load_rules()
-        return cls._instance
-
-    def _load_rules(self, file_path: str = "alias.txt"):
-        """加载别名规则文件，格式：正则表达式 => 替换后的标准名称"""
-        self.rules = []
-        if not os.path.exists(file_path):
-            print(f"⚠️ alias.txt 文件不存在: {file_path}，别名匹配功能不可用")
+    """别名匹配器"""
+    
+    def __init__(self, alias_file: str = "alias.txt"):
+        self.alias_file = alias_file
+        self.mappings: Dict[re.Pattern, str] = {}
+        self._load()
+    
+    def _load(self):
+        """加载别名映射文件"""
+        if not os.path.exists(self.alias_file):
+            print(f"⚠️ 别名文件不存在: {self.alias_file}")
             return
-
-        with open(file_path, "r", encoding="utf-8") as f:
-            for line in f:
+        
+        with open(self.alias_file, 'r', encoding='utf-8') as f:
+            for line_num, line in enumerate(f, 1):
                 line = line.strip()
-                if not line or line.startswith("#"):
+                if not line or line.startswith('#'):
                     continue
-                # 支持两种格式：
-                # 1. pattern => replacement
-                # 2. pattern = replacement
-                if "=>" in line:
-                    parts = line.split("=>", 1)
-                elif "=" in line:
-                    parts = line.split("=", 1)
-                else:
+                # 格式：正则表达式|标准化名称
+                if '|' not in line:
+                    print(f"⚠️ 别名文件第 {line_num} 行格式错误，跳过: {line}")
                     continue
-                if len(parts) != 2:
-                    continue
-                pattern = parts[0].strip()
-                replacement = parts[1].strip()
-                if pattern and replacement:
-                    try:
-                        regex = re.compile(pattern, re.IGNORECASE)
-                        self.rules.append((regex, replacement))
-                    except re.error as e:
-                        print(f"⚠️ 正则表达式错误: {pattern} - {e}")
-
-        print(f"📌 加载了 {len(self.rules)} 条别名匹配规则")
-
-    def apply(self, name: str) -> Tuple[str, bool]:
+                pattern_str, target = line.split('|', 1)
+                pattern_str = pattern_str.strip()
+                target = target.strip()
+                try:
+                    pattern = re.compile(pattern_str, re.IGNORECASE)
+                    self.mappings[pattern] = target
+                except re.error as e:
+                    print(f"⚠️ 别名文件第 {line_num} 行正则错误: {e}")
+        
+        print(f"✅ 已加载 {len(self.mappings)} 条别名规则")
+    
+    def match(self, channel_name: str) -> Optional[str]:
         """
-        应用别名规则，返回 (新名称, 是否匹配)
-        如果匹配到规则，返回替换后的名称和 True；否则返回原名称和 False
+        匹配别名，返回标准化后的名称；若无匹配返回 None
         """
-        for regex, replacement in self.rules:
-            if regex.search(name):
-                new_name = regex.sub(replacement, name)
-                return new_name, True
-        return name, False
-
-    def apply_for_matching(self, name: str) -> str:
-        """
-        用于匹配时应用别名，返回转换后的名称（用于与 demo 频道名比较）
-        只进行转换，不关心是否匹配
-        """
-        for regex, replacement in self.rules:
-            if regex.search(name):
-                return regex.sub(replacement, name)
-        return name
+        for pattern, target in self.mappings.items():
+            if pattern.search(channel_name):
+                return target
+        return None
+    
+    def get_all_standard_names(self) -> set:
+        """获取所有标准化名称集合（用于 demo 匹配）"""
+        return set(self.mappings.values())
 
 # 全局单例
 _matcher = None
