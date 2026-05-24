@@ -35,12 +35,6 @@ http://74.91.26.218:82/live/cctv15hd.m3u8
 http://74.91.26.218:82/live/cctv17hd.m3u8
 #EXTINF:-1 tvg-id="461" group-title="央视",CETV1
 http://120.76.248.139/live/bfgd/4200000135.m3u8
-#EXTINF:-1 tvg-id="100" group-title="央视",CCTV央视台球
-https://epg.pw/stream/ca9c1cd4b97fb824cedd7fedfd0c7a950afdd7f00751cfbb7c2d89831d7746a5.m3u8
-#EXTINF:-1 tvg-id="98" group-title="央视",CCTV第一剧场
-https://epg.pw/stream/6d7bf281e3d739806a73f5373acaa6e01988ec9739f5ac1355ce54b47a928472.m3u8
-#EXTINF:-1 tvg-id="149" group-title="央视",CCTV风云足球
-https://epg.pw/stream/ac8062ec9484078061d3bef507c15a423ac57ae4144e3fcc4b0a198dd420f911.m3u8
 #EXTINF:-1 tvg-id="531" group-title="央视",CCTV老故事
 http://t.061899.xyz/tl/tl.php?id=lgs
 #EXTINF:-1 tvg-id="223" group-title="央视",CGTN俄语
@@ -223,8 +217,6 @@ http://tmpstream.hyrtv.cn/hygg/sd/live.m3u8
 http://tmpstream.hyrtv.cn/xwzh/sd/live.m3u8
 #EXTINF:-1 tvg-id="314" group-title="地方",泰山白云亭悬崖
 https://gcalic.v.myalicdn.com/gc/hkts02_1/index.m3u8
-#EXTINF:-1 tvg-id="631" group-title="地方",番禺综合
-http://video.epaper.pybtv.cn:8080/live/rtmp_live_demo.flv
 #EXTINF:-1 tvg-id="539" group-title="地方",广州综合
 http://tencentplay.gztv.com/live/zonghes.m3u8?txSecret=c8dbe86d6f86eb1a21999ab479fd5667&txTime=18d3c4690e8
 #EXTINF:-1 tvg-id="158" group-title="地方",龙华偶像
@@ -607,8 +599,6 @@ http://cdn6.163189.xyz/163189/fhzw
 http://php.jdshipin.com/TVOD/iptv.php?id=fhzx
 #EXTINF:-1 tvg-id="131" group-title="地方",凤凰香港台
 http://php.jdshipin.com/TVOD/iptv.php?id=fhhk
-#EXTINF:-1 tvg-id="228" group-title="地方",纬来体育
-https://epg.pw/stream/ab6df63b64d0cc44a1f4f029ed847a26fa54a7aebd455578fb05a63f02c22f4b.m3u8
 #EXTINF:-1 tvg-id="588" group-title="地方",环球电视
 http://utv1.hqtvzb.com:9999/hls/world.m3u8
 #EXTINF:-1 tvg-id="409" group-title="地方",台视新闻
@@ -837,14 +827,6 @@ http://live.xysrmt.cn/shpd/sd/live.m3u8?zjiangsd
 https://live.wjyanghu.com/live/CH1.m3u8
 #EXTINF:-1 tvg-id="666" group-title="卫视",武进生活
 http://live.wjyanghu.com/live/CH2.m3u8
-#EXTINF:-1 tvg-id="317" group-title="卫视",江苏体育休闲
-https://stream1.freetv.fun/af1087a1c24fff7af556ac8e6c5c623303d52966f67a998cefb52c17811b09a2.ctv
-#EXTINF:-1 tvg-id="406" group-title="卫视",江苏城市
-https://stream1.freetv.fun/675206b8446ce719bfb293b5a5296db3aa26521c9810de7c996838247cc56964.ctv
-#EXTINF:-1 tvg-id="344" group-title="卫视",江苏影视
-https://stream1.freetv.fun/a89dd489fa013bc4f36bcc4afe388f1783e2251c276e2566a9359d68a61c6d91.ctv
-#EXTINF:-1 tvg-id="316" group-title="卫视",江苏教育
-https://stream1.freetv.fun/7174b4fd66ddb2a7456b7040105dc27a1e57c166593870bb773cb5f6b4546c54.ctv
 #EXTINF:-1 tvg-id="570" group-title="卫视",淮阴综合
 https://huaiyin-tv-replay.cm.jstv.com/huaiyin-tv/huaiyinf.m3u8
 #EXTINF:-1 tvg-id="571" group-title="卫视",苏州文化生活
@@ -861,8 +843,6 @@ http://zjtv-wshls.homecdn.com/live/2aa16.m3u8
 http://zjtv-wshls.homecdn.com/live/2aa50.m3u8
 #EXTINF:-1 tvg-id="376" group-title="卫视",靖江新闻综合
 http://ls.qingting.fm/live/23797.m3u8
-#EXTINF:-1 tvg-id="716" group-title="卫视",山东教育
-https://test1.live.sdetv.com.cn/live/dianshizhibo/playlist.m3u8
 #EXTINF:-1 tvg-id="238" group-title="卫视",湖南张家界宝峰湖
 https://gcalic.v.myalicdn.com/gc/zjjbfh_1/index.m3u8
 #EXTINF:-1 tvg-id="290" group-title="卫视",湖南张家界御笔峰
