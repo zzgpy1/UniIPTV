@@ -19,6 +19,9 @@ from src.merger import merge_channels_by_name
 from src.ip_resolver import get_resolver, matches_region
 from src.cache_manager import CacheManager
 from src.demo_filter import filter_and_reorder_by_demo   # 新增导入
+from src.blacklist import get_blacklist
+   blacklist = get_blacklist()
+   blacklist.load("blacklist.txt")  # 显式加载
 
 def init_ip_resolver():
     if not ENABLE_IP_RESOLVE:
