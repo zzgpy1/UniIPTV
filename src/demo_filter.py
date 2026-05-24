@@ -1,110 +1,95 @@
-# src/demo_filter.py
-# 根据 demo.txt 筛选和排序频道，支持别名匹配
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Demo 频道列表筛选模块（增强版）
+支持别名匹配，将频道名标准化后与 demo 列表比对
+"""
 
-import os
 import re
-from typing import Dict, List, Any
+import os
+from typing import Set, List, Dict, Any
 from src.alias_matcher import get_alias_matcher
+from src.config import DEMO_FILE, ENABLE_DEMO_FILTER, ENABLE_ALIAS
 
-def parse_demo_file(file_path: str = "demo.txt") -> Dict[str, List[str]]:
+def load_demo_channels(demo_file: str = DEMO_FILE) -> Set[str]:
     """
-    解析 demo.txt，返回期望的分类和频道名列表（原始顺序）
+    从 demo.txt 加载期望的频道名称列表
+    返回标准化名称集合（小写，去除特殊字符）
     """
-    if not os.path.exists(file_path):
-        print(f"⚠️ demo.txt 文件不存在: {file_path}，将跳过筛选")
-        return {}
-
-    with open(file_path, "r", encoding="utf-8") as f:
-        lines = f.read().splitlines()
-
-    categories = {}
-    current_cat = None
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        if line.endswith(",#genre#"):
-            current_cat = line[:-7]
-            categories[current_cat] = []
-        elif current_cat is not None:
-            if not line.startswith("#"):
-                categories[current_cat].append(line)
-
-    print(f"📋 从 demo.txt 加载了 {len(categories)} 个分类，共 {sum(len(v) for v in categories.values())} 个期望频道")
-    return categories
+    if not os.path.exists(demo_file):
+        print(f"⚠️ Demo 文件不存在: {demo_file}，将跳过筛选")
+        return set()
+    
+    demos = set()
+    with open(demo_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            # 标准化 demo 名称（与频道名匹配时使用的标准化函数一致）
+            normalized = normalize_name(line)
+            demos.add(normalized)
+    print(f"📋 已加载 {len(demos)} 个 Demo 频道")
+    return demos
 
 def normalize_name(name: str) -> str:
-    """标准化频道名用于匹配（去除清晰度、括号、特殊符号）"""
-    name = re.sub(r'\s*(?:1080[pi]|720[pi]|4K|8K|HD|高清|超清|标清|流畅|付费)\s*', '', name, flags=re.IGNORECASE)
+    """
+    标准化频道名，用于匹配
+    - 转小写
+    - 去除分辨率标签、括号内容
+    - 去除特殊符号
+    """
+    name = name.lower()
+    # 去除清晰度标签
+    name = re.sub(r'\s*(?:1080[pi]|720[pi]|4k|8k|hd|高清|超清|标清|流畅|付费)\s*', '', name, flags=re.IGNORECASE)
+    # 去除括号及内容
     name = re.sub(r'[（(][^）)]*[）)]', '', name)
-    name = re.sub(r'\s+', ' ', name).strip()
-    return name
+    # 去除多余空格和特殊符号（保留字母数字中文）
+    name = re.sub(r'[^\w\u4e00-\u9fa5]', '', name)
+    return name.strip()
 
-def filter_and_reorder_by_demo(classified: Dict[str, List[Dict[str, Any]]]) -> Dict[str, List[Dict[str, Any]]]:
+def filter_by_demo(channels: List[Any], demo_file: str = DEMO_FILE) -> List[Any]:
     """
-    根据 demo.txt 筛选和重排分类及频道，支持别名匹配
+    根据 demo.txt 筛选频道
+    优先使用别名匹配，若无别名则使用标准化名称匹配
     """
-    demo_cats = parse_demo_file()
-    if not demo_cats:
-        print("⚠️ 未加载到 demo 数据，将跳过筛选")
-        return classified
-
-    # 获取别名匹配器
-    alias_matcher = get_alias_matcher()
-
-    # 构建期望频道集合（标准化后）
-    expected_channels = {}  # {标准化名: (分类, 原始名称)}
-    for cat, ch_list in demo_cats.items():
-        for ch in ch_list:
-            norm = normalize_name(ch)
-            expected_channels[norm] = (cat, ch)
-
-    # 从现有分类中提取频道
-    all_channels = []
-    for cat, channels in classified.items():
-        for ch in channels:
-            all_channels.append(ch)
-
-    # 匹配并收集
-    matched = {}  # {标准化名: channel_dict}
-    alias_matched_count = 0
-    for ch in all_channels:
-        name = ch.get("name", "")
-        norm_original = normalize_name(name)
-
-        # 首先尝试直接匹配
-        if norm_original in expected_channels:
-            matched[norm_original] = ch
+    if not ENABLE_DEMO_FILTER:
+        print("⚙️ Demo 筛选未启用")
+        return channels
+    
+    demo_set = load_demo_channels(demo_file)
+    if not demo_set:
+        print("⚠️ Demo 列表为空，保留所有频道")
+        return channels
+    
+    alias_matcher = get_alias_matcher() if ENABLE_ALIAS else None
+    
+    filtered = []
+    for ch in channels:
+        # 获取频道名称
+        if hasattr(ch, 'name'):
+            name = ch.name
+        elif isinstance(ch, dict) and 'name' in ch:
+            name = ch['name']
+        else:
+            filtered.append(ch)
             continue
-
-        # 应用别名转换后再匹配
-        transformed = alias_matcher.apply_for_matching(name)
-        if transformed != name:
-            norm_transformed = normalize_name(transformed)
-            if norm_transformed in expected_channels:
-                # 匹配成功，将原频道的名称替换为转换后的名称（可选，保持输出一致性）
-                ch["original_name"] = name  # 保存原始名
-                ch["name"] = transformed    # 替换为别名后的名称
-                matched[norm_transformed] = ch
-                alias_matched_count += 1
-                continue
-
-    # 按 demo 分类和顺序组织输出
-    result = {}
-    for cat, ch_list in demo_cats.items():
-        result[cat] = []
-        for demo_name in ch_list:
-            norm = normalize_name(demo_name)
-            if norm in matched:
-                result[cat].append(matched[norm])
-
-    # 统计
-    total_matched = sum(len(v) for v in result.values())
-    print(f"🎯 Demo 筛选完成：匹配 {total_matched} 个频道（期望 {len(expected_channels)} 个）")
-    if alias_matched_count > 0:
-        print(f"   其中通过别名匹配成功: {alias_matched_count} 个")
-    for cat, lst in result.items():
-        if lst:
-            print(f"   {cat}: {len(lst)} 个")
-
-    return result
+        
+        # 尝试别名匹配
+        matched = False
+        if alias_matcher:
+            standard_name = alias_matcher.match(name)
+            if standard_name and normalize_name(standard_name) in demo_set:
+                matched = True
+        
+        # 降级使用标准化名称匹配
+        if not matched:
+            norm_name = normalize_name(name)
+            if norm_name in demo_set:
+                matched = True
+        
+        if matched:
+            filtered.append(ch)
+    
+    print(f"🎯 Demo 筛选：{len(channels)} -> {len(filtered)} 个频道")
+    return filtered
