@@ -109,7 +109,7 @@ async def main():
             return 1
         merged_channels = merge_channels_by_name(valid_channels)
 
-        # 黑名单过滤
+        # 黑名单过滤（完整采集）
         if ENABLE_BLACKLIST:
             blacklist_filter = get_blacklist_filter()
             merged_channels = blacklist_filter.filter_channels(merged_channels)
@@ -144,7 +144,7 @@ async def main():
         simple_channels = [SimpleChannel(rec) for rec in cached_records]
         merged_channels = merge_channels_by_name(simple_channels)
 
-        # 黑名单过滤（缓存路径同样需要）
+        # 黑名单过滤（缓存数据同样需要）
         if ENABLE_BLACKLIST:
             blacklist_filter = get_blacklist_filter()
             merged_channels = blacklist_filter.filter_channels(merged_channels)
