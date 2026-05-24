@@ -22,7 +22,7 @@ from src.ip_resolver import get_resolver, matches_region
 from src.cache_manager import CacheManager
 from src.blacklist_filter import get_blacklist_filter
 from src.demo_filter import filter_and_order_by_demo
-from src.alias_matcher import get_alias_matcher
+from src.alias_matcher import get_alias_matcher   # 新增
 
 ALLOWED_CATEGORIES = {"央视", "卫视", "地方", "港澳台"}
 
@@ -57,6 +57,11 @@ def filter_by_region(channels):
     return filtered
 
 def build_classified_from_ordered(ordered_channels, alias_matcher=None):
+    """
+    根据有序频道列表构建分类字典，强制输出顺序：央视、卫视、地方、港澳台。
+    央视内部按 CCTV_ORDER 排序，其他分类保持传入顺序。
+    如果提供了 alias_matcher，则先对频道名进行别名映射（用于央视排序）。
+    """
     temp = {cat: [] for cat in ALLOWED_CATEGORIES}
     for ch in ordered_channels:
         # 获取原始名称
@@ -66,19 +71,38 @@ def build_classified_from_ordered(ordered_channels, alias_matcher=None):
             orig_name = ch.get('name', '')
         else:
             continue
-        # 别名映射
+
+        # 别名映射（仅用于内部识别，不改变原对象）
+        display_name = orig_name
         if alias_matcher:
-            mapped_name = alias_matcher.match(orig_name)
-            if mapped_name:
-                if hasattr(ch, 'name'):
-                    ch.name = mapped_name
-                elif isinstance(ch, dict):
-                    ch['name'] = mapped_name
-        cat = classify_channel(ch)
+            mapped = alias_matcher.match(orig_name)
+            if mapped:
+                display_name = mapped
+
+        # 分类（使用原始名称或映射后的名称均可，但央视匹配建议使用映射后的）
+        cat = classify_channel(ch)  # classify_channel 内部也会调用别名？不，它只基于字符串匹配，所以我们需要传入映射后的名称？由于 classify_channel 会读取 channel.name，我们临时修改？
+        # 更可靠：临时修改频道名称属性
+        if alias_matcher and mapped:
+            if hasattr(ch, 'name'):
+                original_name_backup = ch.name
+                ch.name = mapped
+                cat = classify_channel(ch)
+                ch.name = original_name_backup
+            elif isinstance(ch, dict):
+                original_name_backup = ch['name']
+                ch['name'] = mapped
+                cat = classify_channel(ch)
+                ch['name'] = original_name_backup
+            else:
+                cat = classify_channel(ch)
+        else:
+            cat = classify_channel(ch)
+
         if cat in ["🌊港·澳·台", "港澳台"]:
             cat = "港澳台"
         if cat not in ALLOWED_CATEGORIES:
             continue
+
         # 转换为字典格式
         if hasattr(ch, 'to_dict'):
             ch_dict = ch.to_dict()
@@ -86,7 +110,7 @@ def build_classified_from_ordered(ordered_channels, alias_matcher=None):
             ch_dict = ch
         else:
             ch_dict = {
-                "name": getattr(ch, 'name', ''),
+                "name": display_name,  # 使用映射后的名称作为显示名
                 "url": getattr(ch, 'url', ''),
                 "urls": getattr(ch, 'urls', [getattr(ch, 'url', '')]),
                 "group_title": getattr(ch, 'group_title', ''),
@@ -97,7 +121,8 @@ def build_classified_from_ordered(ordered_channels, alias_matcher=None):
                 "ip_info": getattr(ch, 'ip_info', None)
             }
         temp[cat].append(ch_dict)
-    # 央视排序
+
+    # 央视排序（使用映射后的名称排序）
     def ctv_sort_key(ch):
         name = ch["name"]
         for idx, std in enumerate(CCTV_ORDER):
@@ -106,13 +131,15 @@ def build_classified_from_ordered(ordered_channels, alias_matcher=None):
         return len(CCTV_ORDER)
     if temp["央视"]:
         temp["央视"] = sorted(temp["央视"], key=ctv_sort_key)
-    # 按顺序输出
+
+    # 按强制顺序输出
     result = {}
     for cat in ["央视", "卫视", "地方", "港澳台"]:
         if temp.get(cat):
             result[cat] = temp[cat]
         else:
             result[cat] = []
+
     print("📊 分类统计（强制顺序：央视、卫视、地方、港澳台）：")
     for cat, lst in result.items():
         if lst:
@@ -130,6 +157,7 @@ async def main():
         await check_ffprobe()
 
     cache = CacheManager()
+    # 创建别名匹配器（如果启用）
     alias_matcher = get_alias_matcher() if ENABLE_ALIAS else None
 
     if cache.should_update():
@@ -153,6 +181,7 @@ async def main():
             blacklist_filter = get_blacklist_filter()
             merged_channels = blacklist_filter.filter_channels(merged_channels)
 
+        # 传递别名匹配器给 demo 筛选
         if ENABLE_DEMO_FILTER:
             merged_channels = filter_and_order_by_demo(merged_channels, alias_matcher=alias_matcher)
 
