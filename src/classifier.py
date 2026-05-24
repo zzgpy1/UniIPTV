@@ -16,12 +16,11 @@ PROVINCES = [
 CITY_SUFFIX = ["市", "州", "地区", "盟"]
 
 def _get_name_and_group(channel):
-    """统一获取频道名和 group_title"""
-    if hasattr(channel, 'name'):
-        return channel.name, getattr(channel, 'group_title', '')
-    elif isinstance(channel, dict):
+    """统一获取频道名和 group_title，兼容对象和字典"""
+    if isinstance(channel, dict):
         return channel.get('name', ''), channel.get('group_title', '')
-    return '', ''
+    else:
+        return getattr(channel, 'name', ''), getattr(channel, 'group_title', '')
 
 def classify_channel(channel) -> str:
     """根据频道名匹配分类（兼容对象和字典）"""
@@ -75,10 +74,10 @@ def classify_all(channels: list) -> dict:
         if cat not in classified:
             classified[cat] = []
         # 转换为字典格式
-        if hasattr(ch, 'to_dict'):
-            ch_dict = ch.to_dict()
-        elif isinstance(ch, dict):
+        if isinstance(ch, dict):
             ch_dict = ch
+        elif hasattr(ch, 'to_dict'):
+            ch_dict = ch.to_dict()
         else:
             ch_dict = {
                 "name": getattr(ch, 'name', ''),
