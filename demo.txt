@@ -3,16 +3,11 @@ CCTV-1
 CCTV-2
 CCTV-3
 CCTV-4
-CCTV-4 中文国际
-CCTV-4K
 CCTV-5
 CCTV-5+
-CCTV5+
 CCTV-6
-CCTV-6 电影
 CCTV-7
 CCTV-8
-CCTV-8K
 CCTV-9
 CCTV-10
 CCTV-11
@@ -68,7 +63,6 @@ CHC 家庭影院
 香港卫视
 浙江卫视
 湖南卫视
-湖南卫视 4K
 北京卫视
 湖北卫视
 黑龙江卫视
@@ -1555,9 +1549,6 @@ CHC 电影频道
 美亚电影频道
 龙华电影频道
 龙门飞甲影片
-
-📽️纪录片频道,#genre#
-CGTN 纪录片
 
 🌊港·澳·台,#genre#
 翡翠台
