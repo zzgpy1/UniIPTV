@@ -7,7 +7,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from src.config import (
     IPTV_SOURCES, OUTPUT_DIR, ENABLE_REGION_FILTER,
-    PREFERRED_LOCATION, PREFERRED_ISP, ENABLE_IP_RESOLVE
+    PREFERRED_LOCATION, PREFERRED_ISP, ENABLE_IP_RESOLVE,
+    ENABLE_DEMO_FILTER, ENABLE_ALIAS, ENABLE_BLACKLIST
 )
 from src.fetcher import fetch_all_sources
 from src.parser import parse_and_dedupe
@@ -18,7 +19,8 @@ from src.generator import generate_outputs
 from src.merger import merge_channels_by_name
 from src.ip_resolver import get_resolver, matches_region
 from src.cache_manager import CacheManager
-from src.demo_filter import filter_and_reorder_by_demo   # 新增导入
+from src.blacklist_filter import get_blacklist_filter
+from src.demo_filter import filter_by_demo
 
 def init_ip_resolver():
     if not ENABLE_IP_RESOLVE:
@@ -53,15 +55,13 @@ def filter_by_region(channels):
 async def main():
     print("🚀 IPTV智能整理平台启动")
     print(f"📡 配置：超时={os.getenv('TIMEOUT','10')}s, 并发={os.getenv('MAX_WORKERS','10')}, ffmpeg={os.getenv('FFMPEG_ENABLE','true')}")
+    print(f"📋 增强过滤: demo={ENABLE_DEMO_FILTER}, alias={ENABLE_ALIAS}, blacklist={ENABLE_BLACKLIST}")
     
-     # 加载黑名单并显示状态
-    from src.blacklist import get_blacklist
-    blacklist = get_blacklist()
-    blacklist.load("blacklist.txt")
     init_ip_resolver()
     if os.getenv("FFMPEG_ENABLE", "true").lower() == "true":
         from src.ffmpeg_validator import check_ffprobe
         await check_ffprobe()
+    
     cache = CacheManager()
     if cache.should_update():
         print("\n📥 执行完整采集流程...")
@@ -82,9 +82,21 @@ async def main():
             return 1
         print("🔄 正在合并多源频道...")
         merged_channels = merge_channels_by_name(valid_channels)
+        
+        # ========== 增强过滤步骤 ==========
+        # 1. 黑名单过滤（URL 级别）
+        if ENABLE_BLACKLIST:
+            blacklist_filter = get_blacklist_filter()
+            merged_channels = blacklist_filter.filter_channels(merged_channels)
+        # 2. Demo 筛选（频道名级别，支持别名）
+        if ENABLE_DEMO_FILTER:
+            merged_channels = filter_by_demo(merged_channels)
+        # 3. 地域筛选（可选）
         merged_channels = filter_by_region(merged_channels)
+        # =================================
+        
         if not merged_channels:
-            print("❌ 地域筛选后无有效频道")
+            print("❌ 过滤后无有效频道")
             return 1
         cache.save_to_cache(merged_channels)
         final_channels = merged_channels
@@ -95,17 +107,10 @@ async def main():
             print("⚠️ 缓存无数据，执行完整采集...")
             return await main()
         final_channels = cached_channels
-
+    
     print("📁 执行智能分类...")
     classified = classify_all(final_channels)
-
-    # ========== 新增：根据 demo.txt 筛选和排序 ==========
-    print("🎯 根据 demo.txt 筛选频道并重排顺序...")
-    classified = filter_and_reorder_by_demo(classified)
-    # ================================================
-
     generate_outputs(classified)
-
     total = sum(len(lst) for lst in classified.values())
     print(f"🎉 完成！有效频道总数: {total}")
     print(f"📊 缓存有效期剩余: {cache.get_cache_age() // 3600} 小时")
