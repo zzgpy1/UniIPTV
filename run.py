@@ -14,7 +14,7 @@ from src.fetcher import fetch_all_sources
 from src.parser import parse_and_dedupe
 from src.speed_tester import test_channels_concurrent
 from src.ffmpeg_validator import validate_with_ffmpeg_batch
-from src.classifier import classify_channel   # 只用于获取分类标签
+from src.classifier import classify_channel
 from src.generator import generate_outputs
 from src.merger import merge_channels_by_name
 from src.ip_resolver import get_resolver, matches_region
@@ -53,26 +53,20 @@ def filter_by_region(channels):
     return filtered
 
 def build_classified_from_ordered(ordered_channels):
-    """
-    根据有序频道列表构建分类字典，保持每个分类内频道的原始顺序
-    ordered_channels 中的元素可能是字典或对象
-    """
     classified = {}
     for ch in ordered_channels:
         cat = classify_channel(ch)
         if cat not in classified:
             classified[cat] = []
-        # 统一转换为字典格式
-        if isinstance(ch, dict):
-            ch_dict = ch
-        elif hasattr(ch, 'to_dict'):
+        if hasattr(ch, 'to_dict'):
             ch_dict = ch.to_dict()
+        elif isinstance(ch, dict):
+            ch_dict = ch
         else:
-            # 对象转字典
             ch_dict = {
                 "name": getattr(ch, 'name', ''),
-                "urls": getattr(ch, 'urls', [getattr(ch, 'url', '')]),
                 "url": getattr(ch, 'url', ''),
+                "urls": getattr(ch, 'urls', [getattr(ch, 'url', '')]),
                 "group_title": getattr(ch, 'group_title', ''),
                 "id": getattr(ch, 'tvg_id', ''),
                 "logo": getattr(ch, 'tvg_logo', ''),
@@ -100,9 +94,7 @@ async def main():
     cache = CacheManager()
     if cache.should_update():
         print("\n📥 执行完整采集流程...")
-        print("📥 正在拉取源文件...")
         raw_contents = await fetch_all_sources(IPTV_SOURCES)
-        print("🔧 解析并去重...")
         channels_dict = parse_and_dedupe(raw_contents)
         if not channels_dict:
             print("❌ 未获取到任何频道，请检查网络或源地址")
@@ -115,7 +107,6 @@ async def main():
         if not valid_channels:
             print("❌ 深度验证后无有效频道")
             return 1
-        print("🔄 正在合并多源频道...")
         merged_channels = merge_channels_by_name(valid_channels)
 
         # 黑名单过滤
@@ -123,15 +114,11 @@ async def main():
             blacklist_filter = get_blacklist_filter()
             merged_channels = blacklist_filter.filter_channels(merged_channels)
 
-        # Demo 筛选与排序
+        # Demo 筛选
         if ENABLE_DEMO_FILTER:
             merged_channels = filter_and_order_by_demo(merged_channels)
-        else:
-            merged_channels.sort(key=lambda x: x.get('name') if isinstance(x, dict) else x.name)
 
-        # 地域筛选
         merged_channels = filter_by_region(merged_channels)
-
         if not merged_channels:
             print("❌ 过滤后无有效频道")
             return 1
@@ -143,7 +130,7 @@ async def main():
         if not cached_records:
             print("⚠️ 缓存无数据，执行完整采集...")
             return await main()
-        # 将缓存记录重新组织为频道对象（按名称合并）
+        # 将记录转为简单对象
         class SimpleChannel:
             def __init__(self, data):
                 self.name = data['name']
@@ -156,6 +143,12 @@ async def main():
                 self.ip_info = data.get('ip_info')
         simple_channels = [SimpleChannel(rec) for rec in cached_records]
         merged_channels = merge_channels_by_name(simple_channels)
+
+        # 黑名单过滤（缓存路径同样需要）
+        if ENABLE_BLACKLIST:
+            blacklist_filter = get_blacklist_filter()
+            merged_channels = blacklist_filter.filter_channels(merged_channels)
+
         if ENABLE_DEMO_FILTER:
             final_channels = filter_and_order_by_demo(merged_channels)
         else:
