@@ -44,6 +44,10 @@ def classify_channel(channel) -> str:
     if "卫视" in name:
         return "卫视"
     
+    # 港澳台匹配（优先级高于地方）
+    if any(k in name for k in ["港", "澳", "台", "香港", "澳门", "台湾", "翡翠台", "明珠台", "凤凰"]):
+        return "港澳台"
+    
     # 地方匹配
     for prov in PROVINCES:
         if prov in name:
@@ -68,6 +72,8 @@ def classify_all(channels: list) -> dict:
     """分类所有频道（兼容对象和字典）"""
     classified = {cat: [] for cat in CATEGORY_KEYWORDS.keys()}
     classified["其他"] = []
+    # 增加港澳台分类桶
+    classified["港澳台"] = []
     
     for ch in channels:
         cat = classify_channel(ch)
@@ -92,8 +98,8 @@ def classify_all(channels: list) -> dict:
             }
         classified[cat].append(ch_dict)
     
-    # 分类显示顺序
-    category_order = ["央视", "卫视", "地方", "体育", "动漫", "新闻", "影视", "音乐", "教育", "纪录片", "其他"]
+    # 分类显示顺序（包含港澳台）
+    category_order = ["央视", "卫视", "港澳台", "地方", "体育", "动漫", "新闻", "影视", "音乐", "教育", "纪录片", "其他"]
     result = {}
     for cat in category_order:
         if cat not in classified:
