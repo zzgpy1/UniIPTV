@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-URL 黑名单过滤模块
+URL 黑名单过滤模块（支持正则表达式）
 - 支持对象和字典类型的频道
 - 支持单个 url 或 urls 列表
-- 只要任意 URL 命中黑名单，整个频道被过滤
+- 黑名单文件每行一个关键字，可以是普通字符串或正则表达式（自动检测）
 """
 
 import os
-from typing import List, Any
+import re
+from typing import List, Any, Union
 
 class BlacklistFilter:
     def __init__(self, blacklist_file: str = "blacklist.txt"):
         self.blacklist_file = blacklist_file
-        self.keywords: List[str] = []
+        self.patterns: List[Union[str, re.Pattern]] = []  # 存储原始字符串或编译后的正则
         self._load()
 
     def _load(self):
@@ -25,36 +26,44 @@ class BlacklistFilter:
                 line = line.strip()
                 if not line or line.startswith('#'):
                     continue
-                self.keywords.append(line.lower())
-        print(f"✅ 已加载 {len(self.keywords)} 条黑名单关键字")
+                # 检测是否为正则表达式（包含 . * + ? [ ] ( ) { } \ 等特殊字符）
+                if re.search(r'[\.\*\?\+\[\]\(\)\{\}\\]', line):
+                    try:
+                        pattern = re.compile(line, re.IGNORECASE)
+                        self.patterns.append(pattern)
+                    except re.error as e:
+                        print(f"⚠️ 正则表达式错误: {line} -> {e}")
+                else:
+                    # 普通字符串，转为小写用于子串匹配
+                    self.patterns.append(line.lower())
+        print(f"✅ 已加载 {len(self.patterns)} 条黑名单规则（支持正则）")
 
     def is_blacklisted(self, url: str) -> bool:
-        """检查单个 URL 是否命中黑名单"""
+        """检查 URL 是否命中黑名单"""
         url_lower = url.lower()
-        for kw in self.keywords:
-            if kw in url_lower:
-                return True
+        for p in self.patterns:
+            if isinstance(p, re.Pattern):
+                if p.search(url):
+                    return True
+            else:
+                if p in url_lower:
+                    return True
         return False
 
     def channel_should_be_filtered(self, channel: Any) -> bool:
-        """
-        检查一个频道是否应该被过滤（任何 URL 命中黑名单则返回 True）
-        支持：对象（有 url 或 urls 属性）或字典（有 'url' 或 'urls' 键）
-        """
+        """检查一个频道是否应该被过滤（任何 URL 命中黑名单则返回 True）"""
         urls = []
 
-        # 1. 尝试获取 urls 列表
+        # 获取所有 URL
         if hasattr(channel, 'urls') and channel.urls:
             urls = channel.urls
         elif isinstance(channel, dict) and 'urls' in channel and channel['urls']:
             urls = channel['urls']
-        # 2. 尝试获取单个 url
         elif hasattr(channel, 'url') and channel.url:
             urls = [channel.url]
         elif isinstance(channel, dict) and 'url' in channel and channel['url']:
             urls = [channel['url']]
 
-        # 检查所有 URL
         for url in urls:
             if self.is_blacklisted(url):
                 return True
