@@ -84,3 +84,25 @@ DATABASE_TABLE = "channel_cache"
 MAX_SOURCES_PER_CHANNEL = 5      # 每个频道最多保留几个源
 PREFER_H264 = True               # 是否优先保留 H.264 编码的源
 PREFER_LOCAL_ISP = True          # 是否优先选择同运营商源（需要 IP 解析支持）
+
+# ==================== 增强过滤配置 ====================
+# Demo 频道列表文件（期望保留的频道名称，每行一个）
+DEMO_FILE = "demo.txt"
+
+# 别名映射文件（格式：原始频道名正则 -> 标准化名称）
+# 每行格式：正则表达式|标准化名称
+# 示例：^CCTV[- ]?1$|CCTV-1
+ALIAS_FILE = "alias.txt"
+
+# URL 黑名单文件（包含关键字，匹配则过滤）
+# 每行一个关键字，如：ads、tracking、video.xxx.com
+BLACKLIST_FILE = "blacklist.txt"
+
+# 是否启用 Demo 筛选（默认 true）
+ENABLE_DEMO_FILTER = os.getenv("ENABLE_DEMO_FILTER", "true").lower() == "true"
+
+# 是否启用别名匹配（默认 true）
+ENABLE_ALIAS = os.getenv("ENABLE_ALIAS", "true").lower() == "true"
+
+# 是否启用黑名单过滤（默认 true）
+ENABLE_BLACKLIST = os.getenv("ENABLE_BLACKLIST", "true").lower() == "true"
