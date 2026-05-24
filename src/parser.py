@@ -1,10 +1,7 @@
-# src/parser.py
-# M3U / TXT 解析与去重（增加黑名单过滤）
-
+# M3U / TXT 解析与去重
 import re
 from urllib.parse import urlparse
 from src.config import HEADERS
-from src.blacklist import is_blacklisted   # 新增导入
 
 class Channel:
     def __init__(self, name: str, url: str, group_title: str = "", tvg_id: str = "", tvg_name: str = "", tvg_logo: str = ""):
@@ -29,11 +26,10 @@ class Channel:
         }
 
 def parse_m3u(content: str) -> list:
-    """解析标准 M3U 格式，过滤黑名单 URL"""
+    """解析标准 M3U 格式"""
     channels = []
     lines = content.splitlines()
     i = 0
-    blacklist_hit_count = 0
     while i < len(lines):
         line = lines[i].strip()
         if line.startswith("#EXTINF"):
@@ -58,25 +54,17 @@ def parse_m3u(content: str) -> list:
             if i+1 < len(lines) and not lines[i+1].startswith("#"):
                 url = lines[i+1].strip()
                 if url.startswith(("http://", "https://", "rtmp://", "rtsp://")):
-                    # 黑名单检查
-                    if is_blacklisted(url):
-                        blacklist_hit_count += 1
-                        i += 2
-                        continue
                     channels.append(Channel(name, url, group_title, tvg_id, tvg_name, tvg_logo))
             i += 2
         else:
             i += 1
-    if blacklist_hit_count > 0:
-        print(f"🚫 黑名单过滤: 已拦截 {blacklist_hit_count} 个 URL")
     return channels
 
 def parse_txt(content: str) -> list:
-    """解析 TXT 格式，过滤黑名单 URL"""
+    """解析 TXT 格式（每行一个 URL，可选注释行作为频道名）"""
     channels = []
     lines = content.splitlines()
     current_name = None
-    blacklist_hit_count = 0
     for line in lines:
         line = line.strip()
         if not line or line.startswith("#"):
@@ -84,16 +72,9 @@ def parse_txt(content: str) -> list:
                 current_name = line.lstrip("#").strip()
             continue
         if line.startswith(("http://", "https://", "rtmp://", "rtsp://")):
-            # 黑名单检查
-            if is_blacklisted(line):
-                blacklist_hit_count += 1
-                current_name = None
-                continue
             name = current_name if current_name else "未知频道"
             channels.append(Channel(name, line))
             current_name = None
-    if blacklist_hit_count > 0:
-        print(f"🚫 黑名单过滤: 已拦截 {blacklist_hit_count} 个 URL")
     return channels
 
 def parse_and_dedupe(raw_contents: dict) -> dict:
