@@ -19,9 +19,6 @@ from src.merger import merge_channels_by_name
 from src.ip_resolver import get_resolver, matches_region
 from src.cache_manager import CacheManager
 from src.demo_filter import filter_and_reorder_by_demo   # 新增导入
-from src.blacklist import get_blacklist
-   blacklist = get_blacklist()
-   blacklist.load("blacklist.txt")  # 显式加载
 
 def init_ip_resolver():
     if not ENABLE_IP_RESOLVE:
@@ -56,6 +53,11 @@ def filter_by_region(channels):
 async def main():
     print("🚀 IPTV智能整理平台启动")
     print(f"📡 配置：超时={os.getenv('TIMEOUT','10')}s, 并发={os.getenv('MAX_WORKERS','10')}, ffmpeg={os.getenv('FFMPEG_ENABLE','true')}")
+    
+     # 加载黑名单并显示状态
+    from src.blacklist import get_blacklist
+    blacklist = get_blacklist()
+    blacklist.load("blacklist.txt")
     init_ip_resolver()
     if os.getenv("FFMPEG_ENABLE", "true").lower() == "true":
         from src.ffmpeg_validator import check_ffprobe
