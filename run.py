@@ -18,6 +18,7 @@ from src.generator import generate_outputs
 from src.merger import merge_channels_by_name
 from src.ip_resolver import get_resolver, matches_region
 from src.cache_manager import CacheManager
+from src.demo_filter import filter_and_reorder_by_demo   # 新增导入
 
 def init_ip_resolver():
     if not ENABLE_IP_RESOLVE:
@@ -89,16 +90,23 @@ async def main():
             print("⚠️ 缓存无数据，执行完整采集...")
             return await main()
         final_channels = cached_channels
+
     print("📁 执行智能分类...")
     classified = classify_all(final_channels)
+
+    # ========== 新增：根据 demo.txt 筛选和排序 ==========
+    print("🎯 根据 demo.txt 筛选频道并重排顺序...")
+    classified = filter_and_reorder_by_demo(classified)
+    # ================================================
+
     generate_outputs(classified)
+
     total = sum(len(lst) for lst in classified.values())
     print(f"🎉 完成！有效频道总数: {total}")
     print(f"📊 缓存有效期剩余: {cache.get_cache_age() // 3600} 小时")
-    # 强制刷新输出缓冲区，然后立即退出
     sys.stdout.flush()
     sys.stderr.flush()
-    os._exit(0)  # 强制终止进程，避免卡死
+    os._exit(0)
 
 if __name__ == "__main__":
     try:
