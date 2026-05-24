@@ -19,6 +19,7 @@ class BlacklistFilter:
                 line = line.strip()
                 if not line or line.startswith('#'):
                     continue
+                # 检测是否为正则表达式（包含特殊字符）
                 if re.search(r'[\.\*\?\+\[\]\(\)\{\}\\]', line):
                     try:
                         pattern = re.compile(line, re.IGNORECASE)
