@@ -22,7 +22,6 @@ from src.cache_manager import CacheManager
 from src.blacklist_filter import get_blacklist_filter
 from src.demo_filter import filter_and_order_by_demo
 
-# 允许保留的分类（只输出这些）
 ALLOWED_CATEGORIES = {"央视", "卫视", "地方", "港澳台"}
 
 def init_ip_resolver():
@@ -56,18 +55,15 @@ def filter_by_region(channels):
     return filtered
 
 def build_classified_from_ordered(ordered_channels):
-    """
-    根据有序频道列表构建分类字典，只保留 ALLOWED_CATEGORIES 中的分类，
-    并且保持频道在 demo 中的顺序（分类内顺序和分类间顺序均按首次出现顺序）
-    """
+    """按 demo 顺序构建分类字典，只保留允许的分类，并保持分类内频道顺序"""
     classified = {}
-    category_order = []  # 记录分类出现的顺序
+    category_order = []
+
     for ch in ordered_channels:
         cat = classify_channel(ch)
         # 将 demo 中的“🌊港·澳·台”映射为“港澳台”
         if cat in ["🌊港·澳·台", "港澳台"]:
             cat = "港澳台"
-        # 只保留允许的分类
         if cat not in ALLOWED_CATEGORIES:
             continue
         if cat not in classified:
@@ -91,11 +87,12 @@ def build_classified_from_ordered(ordered_channels):
                 "ip_info": getattr(ch, 'ip_info', None)
             }
         classified[cat].append(ch_dict)
-    # 按照分类首次出现顺序输出
+
     result = {cat: classified[cat] for cat in category_order}
-    print("📊 分类统计（仅保留央视、卫视、地方、港澳台）：")
+    print("📊 分类统计（按 demo 顺序，仅保留央视、卫视、地方、港澳台）：")
     for cat, lst in result.items():
-        print(f"  {cat}: {len(lst)} 个频道")
+        if lst:
+            print(f"  {cat}: {len(lst)} 个频道")
     return result
 
 async def main():
@@ -126,12 +123,10 @@ async def main():
             return 1
         merged_channels = merge_channels_by_name(valid_channels)
 
-        # 黑名单过滤
         if ENABLE_BLACKLIST:
             blacklist_filter = get_blacklist_filter()
             merged_channels = blacklist_filter.filter_channels(merged_channels)
 
-        # Demo 筛选（已按 demo 顺序返回）
         if ENABLE_DEMO_FILTER:
             merged_channels = filter_and_order_by_demo(merged_channels)
 
@@ -147,7 +142,6 @@ async def main():
         if not cached_records:
             print("⚠️ 缓存无数据，执行完整采集...")
             return await main()
-        # 将记录转为简单对象
         class SimpleChannel:
             def __init__(self, data):
                 self.name = data['name']
