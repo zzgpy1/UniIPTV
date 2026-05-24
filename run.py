@@ -14,13 +14,13 @@ from src.fetcher import fetch_all_sources
 from src.parser import parse_and_dedupe
 from src.speed_tester import test_channels_concurrent
 from src.ffmpeg_validator import validate_with_ffmpeg_batch
-from src.classifier import classify_all
+from src.classifier import classify_channel   # 只用于获取分类标签
 from src.generator import generate_outputs
 from src.merger import merge_channels_by_name
 from src.ip_resolver import get_resolver, matches_region
 from src.cache_manager import CacheManager
 from src.blacklist_filter import get_blacklist_filter
-from src.demo_filter import filter_by_demo
+from src.demo_filter import filter_and_order_by_demo
 
 def init_ip_resolver():
     if not ENABLE_IP_RESOLVE:
@@ -52,16 +52,46 @@ def filter_by_region(channels):
     print(f"  筛选结果: {len(filtered)}/{len(channels)} 个频道通过地域筛选")
     return filtered
 
+def build_classified_from_ordered(ordered_channels):
+    """
+    根据有序频道列表构建分类字典，保持每个分类内频道的原始顺序
+    """
+    classified = {}
+    for ch in ordered_channels:
+        cat = classify_channel(ch)
+        if cat not in classified:
+            classified[cat] = []
+        # 转换为字典格式供 generator 使用
+        if hasattr(ch, 'to_dict'):
+            ch_dict = ch.to_dict()
+        else:
+            ch_dict = {
+                "name": ch.name,
+                "urls": getattr(ch, 'urls', [ch.url]),
+                "url": getattr(ch, 'url', ''),
+                "group_title": getattr(ch, 'group_title', ''),
+                "id": getattr(ch, 'tvg_id', ''),
+                "logo": getattr(ch, 'tvg_logo', ''),
+                "latency": getattr(ch, 'latency', 9999),
+                "video_codec": getattr(ch, 'video_codec', ''),
+                "ip_info": getattr(ch, 'ip_info', None)
+            }
+        classified[cat].append(ch_dict)
+    print("📊 分类统计（按 demo 顺序）：")
+    for cat, lst in classified.items():
+        print(f"  {cat}: {len(lst)} 个频道")
+    return classified
+
 async def main():
     print("🚀 IPTV智能整理平台启动")
     print(f"📡 配置：超时={os.getenv('TIMEOUT','10')}s, 并发={os.getenv('MAX_WORKERS','10')}, ffmpeg={os.getenv('FFMPEG_ENABLE','true')}")
     print(f"📋 增强过滤: demo={ENABLE_DEMO_FILTER}, alias={ENABLE_ALIAS}, blacklist={ENABLE_BLACKLIST}")
-    
+
     init_ip_resolver()
     if os.getenv("FFMPEG_ENABLE", "true").lower() == "true":
         from src.ffmpeg_validator import check_ffprobe
         await check_ffprobe()
-    
+
     cache = CacheManager()
     if cache.should_update():
         print("\n📥 执行完整采集流程...")
@@ -82,19 +112,22 @@ async def main():
             return 1
         print("🔄 正在合并多源频道...")
         merged_channels = merge_channels_by_name(valid_channels)
-        
-        # ========== 增强过滤步骤 ==========
-        # 1. 黑名单过滤（URL 级别）
+
+        # 黑名单过滤（URL级别）
         if ENABLE_BLACKLIST:
             blacklist_filter = get_blacklist_filter()
             merged_channels = blacklist_filter.filter_channels(merged_channels)
-        # 2. Demo 筛选（频道名级别，支持别名）
+
+        # Demo 筛选与排序（核心）
         if ENABLE_DEMO_FILTER:
-            merged_channels = filter_by_demo(merged_channels)
-        # 3. 地域筛选（可选）
+            merged_channels = filter_and_order_by_demo(merged_channels)
+        else:
+            # 如果没有启用 demo，则按名称排序
+            merged_channels.sort(key=lambda x: x.name.lower())
+
+        # 地域筛选（可选）
         merged_channels = filter_by_region(merged_channels)
-        # =================================
-        
+
         if not merged_channels:
             print("❌ 过滤后无有效频道")
             return 1
@@ -102,15 +135,34 @@ async def main():
         final_channels = merged_channels
     else:
         print("\n📦 使用缓存数据...")
-        cached_channels = cache.load_from_cache()
-        if not cached_channels:
+        cached_records = cache.load_from_cache()  # 返回的是每个 URL 一条记录的列表
+        if not cached_records:
             print("⚠️ 缓存无数据，执行完整采集...")
             return await main()
-        final_channels = cached_channels
-    
-    print("📁 执行智能分类...")
-    classified = classify_all(final_channels)
+        # 将缓存记录重新组织为频道对象（按名称合并）
+        from src.merger import merge_channels_by_name
+        # 先将记录转换为简单对象
+        class SimpleChannel:
+            def __init__(self, data):
+                self.name = data['name']
+                self.url = data['url']
+                self.latency = data.get('latency', 9999)
+                self.video_codec = data.get('video_codec', '')
+                self.group_title = data.get('group_title', '')
+                self.tvg_id = data.get('id', '')
+                self.tvg_logo = data.get('logo', '')
+                self.ip_info = data.get('ip_info')
+        simple_channels = [SimpleChannel(rec) for rec in cached_records]
+        merged_channels = merge_channels_by_name(simple_channels)
+        if ENABLE_DEMO_FILTER:
+            final_channels = filter_and_order_by_demo(merged_channels)
+        else:
+            final_channels = merged_channels
+
+    # 构建分类字典（保持 demo 顺序）
+    classified = build_classified_from_ordered(final_channels)
     generate_outputs(classified)
+
     total = sum(len(lst) for lst in classified.values())
     print(f"🎉 完成！有效频道总数: {total}")
     print(f"📊 缓存有效期剩余: {cache.get_cache_age() // 3600} 小时")
