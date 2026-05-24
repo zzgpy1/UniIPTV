@@ -55,19 +55,23 @@ def filter_by_region(channels):
 def build_classified_from_ordered(ordered_channels):
     """
     根据有序频道列表构建分类字典，保持每个分类内频道的原始顺序
+    ordered_channels 中的元素可能是字典或对象
     """
     classified = {}
     for ch in ordered_channels:
         cat = classify_channel(ch)
         if cat not in classified:
             classified[cat] = []
-        # 转换为字典格式供 generator 使用
-        if hasattr(ch, 'to_dict'):
+        # 统一转换为字典格式
+        if isinstance(ch, dict):
+            ch_dict = ch
+        elif hasattr(ch, 'to_dict'):
             ch_dict = ch.to_dict()
         else:
+            # 对象转字典
             ch_dict = {
-                "name": ch.name,
-                "urls": getattr(ch, 'urls', [ch.url]),
+                "name": getattr(ch, 'name', ''),
+                "urls": getattr(ch, 'urls', [getattr(ch, 'url', '')]),
                 "url": getattr(ch, 'url', ''),
                 "group_title": getattr(ch, 'group_title', ''),
                 "id": getattr(ch, 'tvg_id', ''),
@@ -79,7 +83,8 @@ def build_classified_from_ordered(ordered_channels):
         classified[cat].append(ch_dict)
     print("📊 分类统计（按 demo 顺序）：")
     for cat, lst in classified.items():
-        print(f"  {cat}: {len(lst)} 个频道")
+        if lst:
+            print(f"  {cat}: {len(lst)} 个频道")
     return classified
 
 async def main():
@@ -113,19 +118,18 @@ async def main():
         print("🔄 正在合并多源频道...")
         merged_channels = merge_channels_by_name(valid_channels)
 
-        # 黑名单过滤（URL级别）
+        # 黑名单过滤
         if ENABLE_BLACKLIST:
             blacklist_filter = get_blacklist_filter()
             merged_channels = blacklist_filter.filter_channels(merged_channels)
 
-        # Demo 筛选与排序（核心）
+        # Demo 筛选与排序
         if ENABLE_DEMO_FILTER:
             merged_channels = filter_and_order_by_demo(merged_channels)
         else:
-            # 如果没有启用 demo，则按名称排序
-            merged_channels.sort(key=lambda x: x.name.lower())
+            merged_channels.sort(key=lambda x: x.get('name') if isinstance(x, dict) else x.name)
 
-        # 地域筛选（可选）
+        # 地域筛选
         merged_channels = filter_by_region(merged_channels)
 
         if not merged_channels:
@@ -135,13 +139,11 @@ async def main():
         final_channels = merged_channels
     else:
         print("\n📦 使用缓存数据...")
-        cached_records = cache.load_from_cache()  # 返回的是每个 URL 一条记录的列表
+        cached_records = cache.load_from_cache()
         if not cached_records:
             print("⚠️ 缓存无数据，执行完整采集...")
             return await main()
         # 将缓存记录重新组织为频道对象（按名称合并）
-        from src.merger import merge_channels_by_name
-        # 先将记录转换为简单对象
         class SimpleChannel:
             def __init__(self, data):
                 self.name = data['name']
@@ -159,7 +161,6 @@ async def main():
         else:
             final_channels = merged_channels
 
-    # 构建分类字典（保持 demo 顺序）
     classified = build_classified_from_ordered(final_channels)
     generate_outputs(classified)
 
