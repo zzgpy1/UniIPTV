@@ -1,10 +1,12 @@
 # src/parser.py
-# M3U / TXT 解析与去重
+# M3U / TXT 解析与去重（增加黑名单过滤）
 
 import re
+from urllib.parse import urlparse
+from src.config import HEADERS
+from src.blacklist import is_blacklisted   # 新增导入
 
 class Channel:
-    """原始频道对象（单源）"""
     def __init__(self, name: str, url: str, group_title: str = "", tvg_id: str = "", tvg_name: str = "", tvg_logo: str = ""):
         self.name = name.strip()
         self.url = url.strip()
@@ -12,10 +14,6 @@ class Channel:
         self.tvg_id = tvg_id
         self.tvg_name = tvg_name
         self.tvg_logo = tvg_logo
-        # 以下属性在后续处理中会被赋值
-        self.latency = None
-        self.video_codec = None
-        self.ip_info = None
 
     def key(self) -> str:
         """去重键：频道名 + URL"""
@@ -27,16 +25,15 @@ class Channel:
             "url": self.url,
             "group_title": self.group_title,
             "id": self.tvg_id,
-            "logo": self.tvg_logo,
-            "latency": self.latency,
-            "video_codec": self.video_codec
+            "logo": self.tvg_logo
         }
 
 def parse_m3u(content: str) -> list:
-    """解析标准 M3U 格式"""
+    """解析标准 M3U 格式，过滤黑名单 URL"""
     channels = []
     lines = content.splitlines()
     i = 0
+    blacklist_hit_count = 0
     while i < len(lines):
         line = lines[i].strip()
         if line.startswith("#EXTINF"):
@@ -57,34 +54,46 @@ def parse_m3u(content: str) -> list:
             match = re.search(r'tvg-logo="([^"]+)"', line)
             if match:
                 tvg_logo = match.group(1)
-            # 频道名在最后一个逗号之后
             name = line.split(",")[-1].strip()
-            # 下一行应该是 URL
             if i+1 < len(lines) and not lines[i+1].startswith("#"):
                 url = lines[i+1].strip()
                 if url.startswith(("http://", "https://", "rtmp://", "rtsp://")):
+                    # 黑名单检查
+                    if is_blacklisted(url):
+                        blacklist_hit_count += 1
+                        i += 2
+                        continue
                     channels.append(Channel(name, url, group_title, tvg_id, tvg_name, tvg_logo))
             i += 2
         else:
             i += 1
+    if blacklist_hit_count > 0:
+        print(f"🚫 黑名单过滤: 已拦截 {blacklist_hit_count} 个 URL")
     return channels
 
 def parse_txt(content: str) -> list:
-    """解析 TXT 格式（每行一个 URL，可选注释行作为频道名）"""
+    """解析 TXT 格式，过滤黑名单 URL"""
     channels = []
     lines = content.splitlines()
     current_name = None
+    blacklist_hit_count = 0
     for line in lines:
         line = line.strip()
         if not line or line.startswith("#"):
             if line.startswith("#") and not line.startswith("#EXT"):
-                # 注释可能用作频道名
                 current_name = line.lstrip("#").strip()
             continue
         if line.startswith(("http://", "https://", "rtmp://", "rtsp://")):
+            # 黑名单检查
+            if is_blacklisted(line):
+                blacklist_hit_count += 1
+                current_name = None
+                continue
             name = current_name if current_name else "未知频道"
             channels.append(Channel(name, line))
             current_name = None
+    if blacklist_hit_count > 0:
+        print(f"🚫 黑名单过滤: 已拦截 {blacklist_hit_count} 个 URL")
     return channels
 
 def parse_and_dedupe(raw_contents: dict) -> dict:
