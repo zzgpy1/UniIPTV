@@ -9,7 +9,7 @@ from src.config import (
     IPTV_SOURCES, OUTPUT_DIR, ENABLE_REGION_FILTER,
     PREFERRED_LOCATION, PREFERRED_ISP, ENABLE_IP_RESOLVE,
     ENABLE_DEMO_FILTER, ENABLE_ALIAS, ENABLE_BLACKLIST,
-    CCTV_ORDER  # 导入央视顺序
+    CCTV_ORDER
 )
 from src.fetcher import fetch_all_sources
 from src.parser import parse_and_dedupe
@@ -22,8 +22,8 @@ from src.ip_resolver import get_resolver, matches_region
 from src.cache_manager import CacheManager
 from src.blacklist_filter import get_blacklist_filter
 from src.demo_filter import filter_and_order_by_demo
+from src.alias_matcher import get_alias_matcher
 
-# 允许保留的分类（只输出这些）
 ALLOWED_CATEGORIES = {"央视", "卫视", "地方", "港澳台"}
 
 def init_ip_resolver():
@@ -56,16 +56,25 @@ def filter_by_region(channels):
     print(f"  筛选结果: {len(filtered)}/{len(channels)} 个频道通过地域筛选")
     return filtered
 
-def build_classified_from_ordered(ordered_channels):
-    """
-    根据有序频道列表构建分类字典，强制输出顺序：央视、卫视、地方、港澳台。
-    央视内部按 CCTV_ORDER 排序，其他分类保持传入顺序（即 demo 中的顺序）。
-    """
-    # 先按原顺序收集每个分类下的频道（保留顺序）
+def build_classified_from_ordered(ordered_channels, alias_matcher=None):
     temp = {cat: [] for cat in ALLOWED_CATEGORIES}
     for ch in ordered_channels:
+        # 获取原始名称
+        if hasattr(ch, 'name'):
+            orig_name = ch.name
+        elif isinstance(ch, dict):
+            orig_name = ch.get('name', '')
+        else:
+            continue
+        # 别名映射
+        if alias_matcher:
+            mapped_name = alias_matcher.match(orig_name)
+            if mapped_name:
+                if hasattr(ch, 'name'):
+                    ch.name = mapped_name
+                elif isinstance(ch, dict):
+                    ch['name'] = mapped_name
         cat = classify_channel(ch)
-        # 映射港澳台
         if cat in ["🌊港·澳·台", "港澳台"]:
             cat = "港澳台"
         if cat not in ALLOWED_CATEGORIES:
@@ -88,24 +97,22 @@ def build_classified_from_ordered(ordered_channels):
                 "ip_info": getattr(ch, 'ip_info', None)
             }
         temp[cat].append(ch_dict)
-
-    # 对央视频道进行排序
+    # 央视排序
     def ctv_sort_key(ch):
         name = ch["name"]
         for idx, std in enumerate(CCTV_ORDER):
             if std.lower() in name.lower() or name.lower() in std.lower():
                 return idx
-        return len(CCTV_ORDER)  # 未匹配的放最后
-    temp["央视"] = sorted(temp["央视"], key=ctv_sort_key)
-
-    # 按强制顺序输出
+        return len(CCTV_ORDER)
+    if temp["央视"]:
+        temp["央视"] = sorted(temp["央视"], key=ctv_sort_key)
+    # 按顺序输出
     result = {}
     for cat in ["央视", "卫视", "地方", "港澳台"]:
         if temp.get(cat):
             result[cat] = temp[cat]
         else:
             result[cat] = []
-
     print("📊 分类统计（强制顺序：央视、卫视、地方、港澳台）：")
     for cat, lst in result.items():
         if lst:
@@ -123,6 +130,8 @@ async def main():
         await check_ffprobe()
 
     cache = CacheManager()
+    alias_matcher = get_alias_matcher() if ENABLE_ALIAS else None
+
     if cache.should_update():
         print("\n📥 执行完整采集流程...")
         raw_contents = await fetch_all_sources(IPTV_SOURCES)
@@ -145,7 +154,7 @@ async def main():
             merged_channels = blacklist_filter.filter_channels(merged_channels)
 
         if ENABLE_DEMO_FILTER:
-            merged_channels = filter_and_order_by_demo(merged_channels)
+            merged_channels = filter_and_order_by_demo(merged_channels, alias_matcher=alias_matcher)
 
         merged_channels = filter_by_region(merged_channels)
         if not merged_channels:
@@ -177,11 +186,11 @@ async def main():
             merged_channels = blacklist_filter.filter_channels(merged_channels)
 
         if ENABLE_DEMO_FILTER:
-            final_channels = filter_and_order_by_demo(merged_channels)
+            final_channels = filter_and_order_by_demo(merged_channels, alias_matcher=alias_matcher)
         else:
             final_channels = merged_channels
 
-    classified = build_classified_from_ordered(final_channels)
+    classified = build_classified_from_ordered(final_channels, alias_matcher=alias_matcher)
     generate_outputs(classified)
 
     total = sum(len(lst) for lst in classified.values())
