@@ -22,6 +22,9 @@ from src.cache_manager import CacheManager
 from src.blacklist_filter import get_blacklist_filter
 from src.demo_filter import filter_and_order_by_demo
 
+# 允许保留的分类（只输出这些）
+ALLOWED_CATEGORIES = {"央视", "卫视", "地方", "港澳台"}
+
 def init_ip_resolver():
     if not ENABLE_IP_RESOLVE:
         print("⚙️ IP解析未启用")
@@ -53,11 +56,24 @@ def filter_by_region(channels):
     return filtered
 
 def build_classified_from_ordered(ordered_channels):
+    """
+    根据有序频道列表构建分类字典，只保留 ALLOWED_CATEGORIES 中的分类，
+    并且保持频道在 demo 中的顺序（分类内顺序和分类间顺序均按首次出现顺序）
+    """
     classified = {}
+    category_order = []  # 记录分类出现的顺序
     for ch in ordered_channels:
         cat = classify_channel(ch)
+        # 将 demo 中的“🌊港·澳·台”映射为“港澳台”
+        if cat in ["🌊港·澳·台", "港澳台"]:
+            cat = "港澳台"
+        # 只保留允许的分类
+        if cat not in ALLOWED_CATEGORIES:
+            continue
         if cat not in classified:
             classified[cat] = []
+            category_order.append(cat)
+        # 转换为字典格式
         if hasattr(ch, 'to_dict'):
             ch_dict = ch.to_dict()
         elif isinstance(ch, dict):
@@ -75,11 +91,12 @@ def build_classified_from_ordered(ordered_channels):
                 "ip_info": getattr(ch, 'ip_info', None)
             }
         classified[cat].append(ch_dict)
-    print("📊 分类统计（按 demo 顺序）：")
-    for cat, lst in classified.items():
-        if lst:
-            print(f"  {cat}: {len(lst)} 个频道")
-    return classified
+    # 按照分类首次出现顺序输出
+    result = {cat: classified[cat] for cat in category_order}
+    print("📊 分类统计（仅保留央视、卫视、地方、港澳台）：")
+    for cat, lst in result.items():
+        print(f"  {cat}: {len(lst)} 个频道")
+    return result
 
 async def main():
     print("🚀 IPTV智能整理平台启动")
@@ -109,12 +126,12 @@ async def main():
             return 1
         merged_channels = merge_channels_by_name(valid_channels)
 
-        # 黑名单过滤（完整采集）
+        # 黑名单过滤
         if ENABLE_BLACKLIST:
             blacklist_filter = get_blacklist_filter()
             merged_channels = blacklist_filter.filter_channels(merged_channels)
 
-        # Demo 筛选
+        # Demo 筛选（已按 demo 顺序返回）
         if ENABLE_DEMO_FILTER:
             merged_channels = filter_and_order_by_demo(merged_channels)
 
@@ -144,7 +161,6 @@ async def main():
         simple_channels = [SimpleChannel(rec) for rec in cached_records]
         merged_channels = merge_channels_by_name(simple_channels)
 
-        # 黑名单过滤（缓存数据同样需要）
         if ENABLE_BLACKLIST:
             blacklist_filter = get_blacklist_filter()
             merged_channels = blacklist_filter.filter_channels(merged_channels)
